@@ -6,9 +6,15 @@ Multiuser AI Chat Solution Accelerator uses [Neon Serverless Postgres](https://l
 
 ![Multiuser AI Chat Solution Accelerator with Neon](/assets/Multiuser%20AI%20Chat%20Solution%20Accelerator%20App%20View%201.png)
 
-## About Neon
+## Features
 
- [Neon](https://neon.tech/) is a serverless, fully managed PostgreSQL database service optimized for modern applications. Neon's advanced features include autoscaling, scale-to-zero, database branching, instant point-in-time restore, and time travel queries. Neon manages the Postgres infrastructure, including database configuration, maintenance, and scaling operations, allowing you to focus on building and optimizing your applications.
+- 🔑 **Authentication and User Management**: Allows flexible login options, including OAuth providers like Google, GitHub, and Microsoft Entra ID (Azure AD).
+- 🧠 **AI-Powered Conversations**: Chat with documents such as PDF. You can also buiild your own prompt templates.
+- 💾 **Chat History**: Stores chat history with multiple chat threads, messages, and metadata.
+- 🎨 **Customizable Chat Personas**: Personalizes conversations with user-defined chat personas. Manage persona settings directly from the application interface.
+- 🛠️ **Extensions Support**: Extends chat functionalities by defining custom extensions. Store and manage extensions in the database, allowing dynamic interaction with custom workflows.
+- 🎙️ **Speech and Voice Support**: Enables multilingual voice interactions in the chat application. Integrate Azure Speech Service for speech-to-text and text-to-speech capabilities.
+- 🌐 **Deployment-Ready Architecture**: Fully deployable to Azure App Service with scalability for enterprise workloads.
 
 ## Solution Benefits
 
@@ -113,3 +119,8 @@ Click on the Deploy to Azure button to deploy the Azure resources for the applic
 
 > [!IMPORTANT]
 > The application is protected by an identity provider and follow the steps in [Add an identity provider](/docs/add-identity.md) section for adding authentication to your app.
+
+
+## About Neon
+
+ [Neon](https://neon.tech/) is a serverless, fully managed PostgreSQL database service optimized for modern applications. Neon's advanced features include autoscaling, scale-to-zero, database branching, instant point-in-time restore, and time travel queries. Neon manages the Postgres infrastructure, including database configuration, maintenance, and scaling operations, allowing you to focus on building and optimizing your applications.

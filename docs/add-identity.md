@@ -87,5 +87,3 @@ AZURE_AD_TENANT_ID=
 ## Configure an admin user
 
 The reporting pages in the application are only available to an admin user. To configure the admin user create or update the `ADMIN_EMAIL_ADDRESS` config setting locally and on Azure App Service with the email address of the user who will use reports.
-
-[Next](/docs/6-chat-over-file.md)
