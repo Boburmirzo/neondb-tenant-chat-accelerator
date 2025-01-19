@@ -17,6 +17,7 @@ param location string
     type: 'location'
   }
 })
+
 param openAILocation string
 
 param openAISku string = 'S0'
@@ -40,9 +41,8 @@ param dalleDeploymentName string = 'dall-e-3'
 param dalleModelName string = 'dall-e-3'
 param dalleApiVersion string = '2023-12-01-preview'
 
+param neonPostgresName string = 'neon-postgres'
 param formRecognizerSkuName string = 'S0'
-param searchServiceIndexName string = 'azure-chat'
-param searchServiceSkuName string = 'standard'
 
 // TODO: define good default Sku and settings for storage account
 param storageServiceSku object = { name: 'Standard_LRS' } 
@@ -67,6 +67,7 @@ module resources 'resources.bicep' = {
     name: name
     resourceToken: resourceToken
     tags: tags
+    neonPostgresName: neonPostgresName
     openai_api_version: openAIApiVersion
     openAiLocation: openAILocation
     openAiSkuName: openAISku
@@ -83,8 +84,6 @@ module resources 'resources.bicep' = {
     dalleModelName: dalleModelName
     dalleApiVersion: dalleApiVersion
     formRecognizerSkuName: formRecognizerSkuName
-    searchServiceIndexName: searchServiceIndexName
-    searchServiceSkuName: searchServiceSkuName
     storageServiceSku: storageServiceSku
     storageServiceImageContainerName: storageServiceImageContainerName
     location: location

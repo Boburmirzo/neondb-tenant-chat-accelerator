@@ -1,8 +1,8 @@
-param name string = 'azurechat-demo'
+param name string = 'multiuser-ai-chat'
 param resourceToken string
 
 param openai_api_version string
-
+param neonPostgresName string
 param openAiLocation string
 param openAiSkuName string 
 param chatGptDeploymentCapacity int 
@@ -23,9 +23,6 @@ param speechServiceSkuName string = 'S0'
 
 param formRecognizerSkuName string = 'S0'
 
-param searchServiceSkuName string = 'standard'
-param searchServiceIndexName string = 'azure-chat'
-
 param storageServiceSku object
 param storageServiceImageContainerName string
 
@@ -41,8 +38,6 @@ var openai_dalle_name = toLower('${name}-aidalle-${resourceToken}')
 
 var form_recognizer_name = toLower('${name}-form-${resourceToken}')
 var speech_service_name = toLower('${name}-speech-${resourceToken}')
-var cosmos_name = toLower('${name}-cosmos-${resourceToken}')
-var search_name = toLower('${name}search${resourceToken}')
 var webapp_name = toLower('${name}-webapp-${resourceToken}')
 var appservice_name = toLower('${name}-app-${resourceToken}')
 // storage name must be < 24 chars, alphanumeric only. 'sto' is 3 and resourceToken is 13
@@ -58,10 +53,6 @@ var diagnostic_setting_name = 'AppServiceConsoleLogs'
 var keyVaultSecretsOfficerRole = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')
 
 var validStorageServiceImageContainerName = toLower(replace(storageServiceImageContainerName, '-', ''))
-
-var databaseName = 'chat'
-var historyContainerName = 'history'
-var configContainerName = 'config'
 
 var llmDeployments = [
   {
@@ -170,26 +161,6 @@ resource webApp 'Microsoft.Web/sites@2020-06-01' = {
           name: 'NEXTAUTH_URL'
           value: 'https://${webapp_name}.azurewebsites.net'
         }
-        {
-          name: 'AZURE_COSMOSDB_URI'
-          value: cosmosDbAccount.properties.documentEndpoint
-        }
-        {
-          name: 'AZURE_COSMOSDB_KEY'
-          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::AZURE_COSMOSDB_KEY.name})'
-        }
-        {
-          name: 'AZURE_SEARCH_API_KEY'
-          value: '@Microsoft.KeyVault(VaultName=${kv.name};SecretName=${kv::AZURE_SEARCH_API_KEY.name})'
-        }
-        { 
-          name: 'AZURE_SEARCH_NAME'
-          value: search_name
-        }
-        { 
-          name: 'AZURE_SEARCH_INDEX_NAME'
-          value: searchServiceIndexName
-        }
         { 
           name: 'AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT'
           value: 'https://${form_recognizer_name}.cognitiveservices.azure.com/'
@@ -226,6 +197,51 @@ resource webApp 'Microsoft.Web/sites@2020-06-01' = {
       detailedErrorMessages: { enabled: true }
       failedRequestsTracing: { enabled: true }
       httpLogs: { fileSystem: { enabled: true, retentionInDays: 1, retentionInMb: 35 } }
+    }
+  }
+}
+
+resource symbolicname 'Neon.Postgres/organizations@2024-08-01-preview' = {
+  location: location
+  name: neonPostgresName
+  tags: tags
+  properties: {
+    companyDetails: {
+      businessPhone: 'string'
+      companyName: 'string'
+      country: 'string'
+      domain: 'string'
+    }
+    marketplaceDetails: {
+      offerDetails: {
+        offerId: 'string'
+        planId: 'string'
+        planName: 'string'
+        publisherId: 'string'
+        termId: 'string'
+        termUnit: 'string'
+      }
+      subscriptionId: 'string'
+      subscriptionStatus: 'string'
+    }
+    partnerOrganizationProperties: {
+      organizationId: 'string'
+      organizationName: 'string'
+      singleSignOnProperties: {
+        aadDomains: [
+          'string'
+        ]
+        enterpriseAppId: 'string'
+        singleSignOnState: 'string'
+        singleSignOnUrl: 'string'
+      }
+    }
+    userDetails: {
+      emailAddress: 'string'
+      firstName: 'string'
+      lastName: 'string'
+      phoneNumber: 'string'
+      upn: 'string'
     }
   }
 }
@@ -299,14 +315,6 @@ resource kv 'Microsoft.KeyVault/vaults@2021-06-01-preview' = {
     }
   }
 
-  resource AZURE_COSMOSDB_KEY 'secrets' = {
-    name: 'AZURE-COSMOSDB-KEY'
-    properties: {
-      contentType: 'text/plain'
-      value: cosmosDbAccount.listKeys().secondaryMasterKey
-    }
-  }
-
   resource AZURE_DOCUMENT_INTELLIGENCE_KEY 'secrets' = {
     name: 'AZURE-DOCUMENT-INTELLIGENCE-KEY'
     properties: {
@@ -323,78 +331,11 @@ resource kv 'Microsoft.KeyVault/vaults@2021-06-01-preview' = {
     }
   }
 
-  resource AZURE_SEARCH_API_KEY 'secrets' = {
-    name: 'AZURE-SEARCH-API-KEY'
-    properties: {
-      contentType: 'text/plain'
-      value: searchService.listAdminKeys().secondaryKey
-    }
-  }
-
   resource AZURE_STORAGE_ACCOUNT_KEY 'secrets' = {
     name: 'AZURE-STORAGE-ACCOUNT-KEY'
     properties: {
       contentType: 'text/plain'
       value: storage.listKeys().keys[0].value
-    }
-  }
-}
-
-resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2023-04-15' = {
-  name: cosmos_name
-  location: location
-  tags: tags
-  kind: 'GlobalDocumentDB'
-  properties: {
-    databaseAccountOfferType: 'Standard'
-    locations: [
-      {
-        locationName: location
-        failoverPriority: 0
-      }
-    ]
-    disableKeyBasedMetadataWriteAccess: true
-  }
-}
-
-resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2022-05-15' = {
-  name: databaseName
-  parent: cosmosDbAccount
-  properties: {
-    resource: {
-      id: databaseName
-    }
-  }
-}
-
-resource historyContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2022-05-15' = {
-  name: historyContainerName
-  parent: database
-  properties: {
-    resource: {
-      id: historyContainerName
-      partitionKey: {
-        paths: [
-          '/userId'
-        ]
-        kind: 'Hash'
-      }
-    }
-  }
-}
-
-resource configContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2022-05-15' = {
-  name: configContainerName
-  parent: database
-  properties: {
-    resource: {
-      id: configContainerName
-      partitionKey: {
-        paths: [
-          '/userId'
-        ]
-        kind: 'Hash'
-      }
     }
   }
 }
@@ -410,20 +351,6 @@ resource formRecognizer 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
   }
   sku: {
     name: formRecognizerSkuName
-  }
-}
-
-resource searchService 'Microsoft.Search/searchServices@2022-09-01' = {
-  name: search_name
-  location: location
-  tags: tags
-  properties: {
-    partitionCount: 1
-    publicNetworkAccess: 'enabled'
-    replicaCount: 1
-  }
-  sku: {
-    name: searchServiceSkuName
   }
 }
 
@@ -447,7 +374,6 @@ resource llmdeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05
   name: deployment.name
   properties: {
     model: deployment.model
-    raiPolicyName: contains(deployment, 'raiPolicyName') ? deployment.raiPolicyName : null
   }
   sku: contains(deployment, 'sku') ? deployment.sku : {
     name: 'Standard'

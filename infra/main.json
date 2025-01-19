@@ -4,8 +4,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.29.47.4906",
-      "templateHash": "18214004695586675733"
+      "version": "0.32.4.45862",
+      "templateHash": "5933110433756737368"
     }
   },
   "parameters": {
@@ -28,12 +28,27 @@
       "type": "string",
       "allowedValues": [
         "australiaeast",
+        "brazilsouth",
         "canadaeast",
+        "eastus",
+        "eastus2",
         "francecentral",
+        "germanywestcentral",
+        "japaneast",
+        "koreacentral",
+        "northcentralus",
+        "norwayeast",
+        "polandcentral",
+        "spaincentral",
+        "southafricanorth",
+        "southcentralus",
         "southindia",
-        "uksouth",
         "swedencentral",
-        "westus"
+        "switzerlandnorth",
+        "uksouth",
+        "westeurope",
+        "westus",
+        "westus3"
       ],
       "metadata": {
         "azd": {
@@ -48,7 +63,7 @@
     },
     "openAIApiVersion": {
       "type": "string",
-      "defaultValue": "2024-05-13"
+      "defaultValue": "2024-08-01-preview"
     },
     "chatGptDeploymentCapacity": {
       "type": "int",
@@ -81,7 +96,9 @@
     "dalleLocation": {
       "type": "string",
       "allowedValues": [
-        "swedencentral"
+        "swedencentral",
+        "eastus",
+        "australiaeast"
       ],
       "metadata": {
         "description": "Location for the OpenAI DALL-E 3 instance resource group"
@@ -103,17 +120,13 @@
       "type": "string",
       "defaultValue": "2023-12-01-preview"
     },
+    "neonPostgresName": {
+      "type": "string",
+      "defaultValue": "neon-postgres"
+    },
     "formRecognizerSkuName": {
       "type": "string",
       "defaultValue": "S0"
-    },
-    "searchServiceIndexName": {
-      "type": "string",
-      "defaultValue": "azure-chat"
-    },
-    "searchServiceSkuName": {
-      "type": "string",
-      "defaultValue": "standard"
     },
     "storageServiceSku": {
       "type": "object",
@@ -164,6 +177,9 @@
           "tags": {
             "value": "[variables('tags')]"
           },
+          "neonPostgresName": {
+            "value": "[parameters('neonPostgresName')]"
+          },
           "openai_api_version": {
             "value": "[parameters('openAIApiVersion')]"
           },
@@ -212,12 +228,6 @@
           "formRecognizerSkuName": {
             "value": "[parameters('formRecognizerSkuName')]"
           },
-          "searchServiceIndexName": {
-            "value": "[parameters('searchServiceIndexName')]"
-          },
-          "searchServiceSkuName": {
-            "value": "[parameters('searchServiceSkuName')]"
-          },
           "storageServiceSku": {
             "value": "[parameters('storageServiceSku')]"
           },
@@ -234,19 +244,22 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.29.47.4906",
-              "templateHash": "18109441359842852578"
+              "version": "0.32.4.45862",
+              "templateHash": "3679852009160364678"
             }
           },
           "parameters": {
             "name": {
               "type": "string",
-              "defaultValue": "azurechat-demo"
+              "defaultValue": "multiuser-ai-chat"
             },
             "resourceToken": {
               "type": "string"
             },
             "openai_api_version": {
+              "type": "string"
+            },
+            "neonPostgresName": {
               "type": "string"
             },
             "openAiLocation": {
@@ -299,14 +312,6 @@
               "type": "string",
               "defaultValue": "S0"
             },
-            "searchServiceSkuName": {
-              "type": "string",
-              "defaultValue": "standard"
-            },
-            "searchServiceIndexName": {
-              "type": "string",
-              "defaultValue": "azure-chat"
-            },
             "storageServiceSku": {
               "type": "object"
             },
@@ -331,11 +336,10 @@
             "openai_dalle_name": "[toLower(format('{0}-aidalle-{1}', parameters('name'), parameters('resourceToken')))]",
             "form_recognizer_name": "[toLower(format('{0}-form-{1}', parameters('name'), parameters('resourceToken')))]",
             "speech_service_name": "[toLower(format('{0}-speech-{1}', parameters('name'), parameters('resourceToken')))]",
-            "cosmos_name": "[toLower(format('{0}-cosmos-{1}', parameters('name'), parameters('resourceToken')))]",
-            "search_name": "[toLower(format('{0}search{1}', parameters('name'), parameters('resourceToken')))]",
             "webapp_name": "[toLower(format('{0}-webapp-{1}', parameters('name'), parameters('resourceToken')))]",
             "appservice_name": "[toLower(format('{0}-app-{1}', parameters('name'), parameters('resourceToken')))]",
-            "storage_prefix": "[take(parameters('name'), 8)]",
+            "clean_name": "[replace(replace(parameters('name'), '-', ''), '_', '')]",
+            "storage_prefix": "[take(variables('clean_name'), 8)]",
             "storage_name": "[toLower(format('{0}sto{1}', variables('storage_prefix'), parameters('resourceToken')))]",
             "kv_prefix": "[take(parameters('name'), 7)]",
             "keyVaultName": "[toLower(format('{0}-kv-{1}', variables('kv_prefix'), parameters('resourceToken')))]",
@@ -343,9 +347,6 @@
             "diagnostic_setting_name": "AppServiceConsoleLogs",
             "keyVaultSecretsOfficerRole": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')]",
             "validStorageServiceImageContainerName": "[toLower(replace(parameters('storageServiceImageContainerName'), '-', ''))]",
-            "databaseName": "chat",
-            "historyContainerName": "history",
-            "configContainerName": "config",
             "llmDeployments": [
               {
                 "name": "[parameters('chatGptDeploymentName')]",
@@ -440,19 +441,6 @@
             {
               "type": "Microsoft.KeyVault/vaults/secrets",
               "apiVersion": "2021-06-01-preview",
-              "name": "[format('{0}/{1}', variables('keyVaultName'), 'AZURE-COSMOSDB-KEY')]",
-              "properties": {
-                "contentType": "text/plain",
-                "value": "[listKeys(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name')), '2023-04-15').secondaryMasterKey]"
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name'))]",
-                "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
-              ]
-            },
-            {
-              "type": "Microsoft.KeyVault/vaults/secrets",
-              "apiVersion": "2021-06-01-preview",
               "name": "[format('{0}/{1}', variables('keyVaultName'), 'AZURE-DOCUMENT-INTELLIGENCE-KEY')]",
               "properties": {
                 "contentType": "text/plain",
@@ -474,19 +462,6 @@
               "dependsOn": [
                 "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
                 "[resourceId('Microsoft.CognitiveServices/accounts', variables('speech_service_name'))]"
-              ]
-            },
-            {
-              "type": "Microsoft.KeyVault/vaults/secrets",
-              "apiVersion": "2021-06-01-preview",
-              "name": "[format('{0}/{1}', variables('keyVaultName'), 'AZURE-SEARCH-API-KEY')]",
-              "properties": {
-                "contentType": "text/plain",
-                "value": "[listAdminKeys(resourceId('Microsoft.Search/searchServices', variables('search_name')), '2022-09-01').secondaryKey]"
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
-                "[resourceId('Microsoft.Search/searchServices', variables('search_name'))]"
               ]
             },
             {
@@ -626,26 +601,6 @@
                       "value": "[format('https://{0}.azurewebsites.net', variables('webapp_name'))]"
                     },
                     {
-                      "name": "AZURE_COSMOSDB_URI",
-                      "value": "[reference(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name')), '2023-04-15').documentEndpoint]"
-                    },
-                    {
-                      "name": "AZURE_COSMOSDB_KEY",
-                      "value": "[format('@Microsoft.KeyVault(VaultName={0};SecretName={1})', variables('keyVaultName'), 'AZURE-COSMOSDB-KEY')]"
-                    },
-                    {
-                      "name": "AZURE_SEARCH_API_KEY",
-                      "value": "[format('@Microsoft.KeyVault(VaultName={0};SecretName={1})', variables('keyVaultName'), 'AZURE-SEARCH-API-KEY')]"
-                    },
-                    {
-                      "name": "AZURE_SEARCH_NAME",
-                      "value": "[variables('search_name')]"
-                    },
-                    {
-                      "name": "AZURE_SEARCH_INDEX_NAME",
-                      "value": "[parameters('searchServiceIndexName')]"
-                    },
-                    {
                       "name": "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT",
                       "value": "[format('https://{0}.cognitiveservices.azure.com/', variables('form_recognizer_name'))]"
                     },
@@ -677,17 +632,60 @@
               },
               "dependsOn": [
                 "[resourceId('Microsoft.Web/serverfarms', variables('appservice_name'))]",
-                "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'AZURE-COSMOSDB-KEY')]",
                 "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'AZURE-DOCUMENT-INTELLIGENCE-KEY')]",
                 "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'AZURE-OPENAI-API-KEY')]",
                 "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'AZURE-OPENAI-DALLE-API-KEY')]",
-                "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'AZURE-SEARCH-API-KEY')]",
                 "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'AZURE-SPEECH-KEY')]",
                 "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'AZURE-STORAGE-ACCOUNT-KEY')]",
-                "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name'))]",
                 "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
                 "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'NEXTAUTH-SECRET')]"
               ]
+            },
+            {
+              "type": "Neon.Postgres/organizations",
+              "apiVersion": "2024-08-01-preview",
+              "name": "[parameters('neonPostgresName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "companyDetails": {
+                  "businessPhone": "string",
+                  "companyName": "string",
+                  "country": "string",
+                  "domain": "string"
+                },
+                "marketplaceDetails": {
+                  "offerDetails": {
+                    "offerId": "string",
+                    "planId": "string",
+                    "planName": "string",
+                    "publisherId": "string",
+                    "termId": "string",
+                    "termUnit": "string"
+                  },
+                  "subscriptionId": "string",
+                  "subscriptionStatus": "string"
+                },
+                "partnerOrganizationProperties": {
+                  "organizationId": "string",
+                  "organizationName": "string",
+                  "singleSignOnProperties": {
+                    "aadDomains": [
+                      "string"
+                    ],
+                    "enterpriseAppId": "string",
+                    "singleSignOnState": "string",
+                    "singleSignOnUrl": "string"
+                  }
+                },
+                "userDetails": {
+                  "emailAddress": "bobur@neon.tech",
+                  "firstName": "string",
+                  "lastName": "string",
+                  "phoneNumber": "string",
+                  "upn": "string"
+                }
+              }
             },
             {
               "type": "Microsoft.OperationalInsights/workspaces",
@@ -748,75 +746,6 @@
               }
             },
             {
-              "type": "Microsoft.DocumentDB/databaseAccounts",
-              "apiVersion": "2023-04-15",
-              "name": "[variables('cosmos_name')]",
-              "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
-              "kind": "GlobalDocumentDB",
-              "properties": {
-                "databaseAccountOfferType": "Standard",
-                "locations": [
-                  {
-                    "locationName": "[parameters('location')]",
-                    "failoverPriority": 0
-                  }
-                ],
-                "disableKeyBasedMetadataWriteAccess": true
-              }
-            },
-            {
-              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
-              "apiVersion": "2022-05-15",
-              "name": "[format('{0}/{1}', variables('cosmos_name'), variables('databaseName'))]",
-              "properties": {
-                "resource": {
-                  "id": "[variables('databaseName')]"
-                }
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmos_name'))]"
-              ]
-            },
-            {
-              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
-              "apiVersion": "2022-05-15",
-              "name": "[format('{0}/{1}/{2}', variables('cosmos_name'), variables('databaseName'), variables('historyContainerName'))]",
-              "properties": {
-                "resource": {
-                  "id": "[variables('historyContainerName')]",
-                  "partitionKey": {
-                    "paths": [
-                      "/userId"
-                    ],
-                    "kind": "Hash"
-                  }
-                }
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmos_name'), variables('databaseName'))]"
-              ]
-            },
-            {
-              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
-              "apiVersion": "2022-05-15",
-              "name": "[format('{0}/{1}/{2}', variables('cosmos_name'), variables('databaseName'), variables('configContainerName'))]",
-              "properties": {
-                "resource": {
-                  "id": "[variables('configContainerName')]",
-                  "partitionKey": {
-                    "paths": [
-                      "/userId"
-                    ],
-                    "kind": "Hash"
-                  }
-                }
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmos_name'), variables('databaseName'))]"
-              ]
-            },
-            {
               "type": "Microsoft.CognitiveServices/accounts",
               "apiVersion": "2023-05-01",
               "name": "[variables('form_recognizer_name')]",
@@ -829,21 +758,6 @@
               },
               "sku": {
                 "name": "[parameters('formRecognizerSkuName')]"
-              }
-            },
-            {
-              "type": "Microsoft.Search/searchServices",
-              "apiVersion": "2022-09-01",
-              "name": "[variables('search_name')]",
-              "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
-              "properties": {
-                "partitionCount": 1,
-                "publicNetworkAccess": "enabled",
-                "replicaCount": 1
-              },
-              "sku": {
-                "name": "[parameters('searchServiceSkuName')]"
               }
             },
             {
@@ -872,8 +786,7 @@
               "apiVersion": "2023-05-01",
               "name": "[format('{0}/{1}', variables('openai_name'), variables('llmDeployments')[copyIndex()].name)]",
               "properties": {
-                "model": "[variables('llmDeployments')[copyIndex()].model]",
-                "raiPolicyName": "[if(contains(variables('llmDeployments')[copyIndex()], 'raiPolicyName'), variables('llmDeployments')[copyIndex()].raiPolicyName, null())]"
+                "model": "[variables('llmDeployments')[copyIndex()].model]"
               },
               "sku": "[if(contains(variables('llmDeployments')[copyIndex()], 'sku'), variables('llmDeployments')[copyIndex()].sku, createObject('name', 'Standard', 'capacity', variables('llmDeployments')[copyIndex()].capacity))]",
               "dependsOn": [

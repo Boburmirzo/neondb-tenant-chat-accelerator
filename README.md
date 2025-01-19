@@ -66,7 +66,7 @@ Clone this repository locally or fork it to your Github account.
 
 - Neon Database: Create a Neon resource on [Azure](https://fyi.neon.tech/azureportal) (or directly via the [Neon Console](https://console.neon.tech/)), if you haven't already provisioned it together with other Azure resources. After creating the instance, set up the required database schemas by running the SQL scripts located in the `data` folder.
 
-- Access the [Neon instance](https://console.neon.tech) and run the SQL queries from the data folder to set up the database schema. These include tables like `chat_threads`, `chat_messages`, `personas`, `extensions`, `documents`, and `prompts`.
+- Access the [Neon instance](https://console.neon.tech) and run the SQL queries from the [data folder](/data/schema.sql) to set up the database schema. These include tables like `chat_threads`, `chat_messages`, `personas`, `extensions`, `documents`, and `prompts`.
 
 - Identity Provider: For local development, you have the option of using a username/password. If you prefer to use an Identity Provider, [follow the instructions](/docs/add-identity.md) to configure one.
 
