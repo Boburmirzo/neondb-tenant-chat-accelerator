@@ -1,36 +1,82 @@
-# Unleash the Power of Azure OpenAI
+# Multiuser AI Chat Solution Accelerator
 
-1. [Introduction](#introduction)
-1. [Solution Overview](/docs/1-introduction.md)
-1. [Deploy to Azure](#deploy-to-azure)
-1. [Run from your local machine](/docs/3-run-locally.md)
-1. [Deploy to Azure with GitHub Actions](/docs/4-deploy-to-azure.md)
-1. [Add identity provider](/docs/5-add-identity.md)
-1. [Chatting with your file](/docs/6-chat-over-file.md)
-1. [Persona](/docs/6-persona.md)
-1. [Extensions](/docs/8-extensions.md)
-1. [Environment variables](/docs/9-environment-variables.md)
-1. [Migration considerations](/docs/migration.md)
+## Introduction
 
-# Introduction
+Multiuser AI Chat Solution Accelerator uses [Neon Serverless Postgres](https://learn.microsoft.com/en-us/azure/partner-solutions/neon/overview) on Azure to allow organisations to deploy a private chat tenant in their Azure Subscription with dedicated database branches per user. It is a modified version of [Azure Chat Solution Accelerator](https://github.com/microsoft/azurechat) by replacing [Azure AI Search](https://learn.microsoft.com/en-GB/azure/search/) and [Azure CosmosDB](https://learn.microsoft.com/en-GB/azure/cosmos-db/nosql/) with [Neon](https://neon.tech/) for chat data storage and search functionality.
 
-_Azure Chat Solution Accelerator powered by Azure OpenAI Service_
+![Multiuser AI Chat Solution Accelerator with Neon](/assets/Multiuser%20AI%20Chat%20Solution%20Accelerator%20App%20View%201.png)
 
-![](/docs/images/intro.png)
+## About Neon
 
-_Azure Chat Solution Accelerator powered by Azure OpenAI Service_ is a solution accelerator that allows organisations to deploy a private chat tenant in their Azure Subscription, with a familiar user experience and the added capabilities of chatting over your data and files.
+ [Neon](https://neon.tech/) is a serverless, fully managed PostgreSQL database service optimized for modern applications. Neon's advanced features include autoscaling, scale-to-zero, database branching, instant point-in-time restore, and time travel queries. Neon manages the Postgres infrastructure, including database configuration, maintenance, and scaling operations, allowing you to focus on building and optimizing your applications.
 
-Benefits are:
+## Solution Benefits
 
-1. Private: Deployed in your Azure tenancy, allowing you to isolate it to your Azure tenant.
+- **Private**: Offers both application and database level isolation with standalone single-tenant app with single-tenant database. You can use it with your own internal data sources (PDFs, Docs) or integrate with your internal services (APIs)
+- **Cost-Efficient**: Combines relational storage, vector storage in a single platform reduces the need for additional services, lowering costs. Scale efficiently as your user base grows while keeping costs manageable.
 
-2. Controlled: Network traffic can be fully isolated to your network and other enterprise grade authentication security features are built in.
 
-3. Value: Deliver added business value with your own internal data sources (plug and play) or integrate with your internal services (e.g., ServiceNow, etc).
 
-# Deploy to Azure
+## Technologies Used
 
-You can provision Azure resources for the solution accelerator using either the Azure Developer CLI or the Deploy to Azure button below. Regardless of the method you chose you will still need set up an [identity provider and specify an admin user](/docs/5-add-identity.md)
+### Azure Services
+
+| **Service**                        | **Usage in the Project**                                                                                                     |
+|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| **Azure OpenAI**                    | Provides models like GPT-4o for generating AI-powered conversational responses and vector embeddings for semantic search. |
+| **Azure Key Vault**                 | Securely stores sensitive information such as API keys, secrets, and connection strings. Used for authentication and APIs.    |
+| **Azure Blob Storage**              | Handles file storage and uploads for documents or media used in the chat system. Scalable solution for data backups.         |
+| **Azure App Service**               | Hosts the web application, REST APIs, and back-end services. Provides a managed environment to deploy and run the solution.   |
+| **Azure Monitor**                   | Tracks and monitors application performance, errors, and logs. Helps in diagnosing issues and optimizing performance.         |
+| **Microsoft Entra ID (Azure AD)**   | Provides secure user authentication and authorization through OAuth2.0. Integrates with organizational identity systems.       |
+| **Azure Document Intelligence**     | Automates data extraction from uploaded documents using AI and OCR (Optical Character Recognition).                          |
+| **Azure Speech Service**            | Converts speech to text and vice versa, enabling voice commands or responses in the chat system. Supports multilingual use.   |
+
+
+### Development Tools
+
+- [Node.js 18](https://nodejs.org/en): an open-source, cross-platform JavaScript runtime environment.
+
+- [Next.js 13](https://nextjs.org/docs): enables you to create full-stack web applications by extending the latest React features
+
+- [NextAuth.js](https://next-auth.js.org/): configurable authentication framework for Next.js 13
+
+- [OpenAI sdk](https://github.com/openai/openai-node) NodeJS library that simplifies building conversational UI
+
+- [Tailwind CSS](https://tailwindcss.com/): is a utility-first CSS framework that provides a series of predefined classes that can be used to style each element by mixing and matching
+
+- [shadcn/ui](https://ui.shadcn.com/): re-usable components built using Radix UI and Tailwind CSS. 
+
+
+## Solution Architecture
+
+The following high-level diagram depicts the architecture of the solution accelerator:
+
+## 👨🏻‍💻 Run Locally
+
+Clone this repository locally or fork it to your Github account.
+
+### Prerequisites
+
+- Neon Database: Create a Neon resource on [Azure](https://fyi.neon.tech/azureportal) (or directly via the [Neon Console](https://console.neon.tech/)), if you haven't already provisioned it together with other Azure resources. After creating the instance, set up the required database schemas by running the SQL scripts located in the `data` folder.
+
+- Access the [Neon instance](https://console.neon.tech) and run the SQL queries from the data folder to set up the database schema. These include tables like `chat_threads`, `chat_messages`, `personas`, `extensions`, `documents`, and `prompts`.
+
+- Identity Provider: For local development, you have the option of using a username/password. If you prefer to use an Identity Provider, [follow the instructions](/docs/add-identity.md) to configure one.
+
+### Steps
+
+1. Change directory to the `src` folder
+2. Rename the file `.env.example` to `.env.local` and populate the environment variables based on the deployed resources in Azure.
+3. Install npm packages by running `npm install`
+4. Start the app by running `npm run dev`
+5. Access the app on [http://localhost:3000](http://localhost:3000)
+
+You should now be prompted to login with your chosen OAuth provider.
+
+> [!NOTE]
+> If using Basic Auth (DEV ONLY) any username you enter will create a new user id (hash of username@localhost). You can use this to simulate multiple users. Once successfully logged in, you can start creating new conversations.
+
 
 ## Deployment Options
 
@@ -59,35 +105,11 @@ azd up --debug
 ### 2. Azure Portal Deployment
 
 > [!WARNING]
-> This button will only create Azure resources. You will still need to deploy the application by following the [deploy to Azure section](/docs/4-deploy-to-azure.md) to build and deploy the application using GitHub actions.
+> This button will only create Azure resources. You will still need to deploy the application by following the [deploy to Azure section](/docs/deploy-to-azure-github-actions.md) to build and deploy the application using GitHub actions.
 
 Click on the Deploy to Azure button to deploy the Azure resources for the application.
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://aka.ms/anzappazurechatgpt)
 
 > [!IMPORTANT]
-> The application is protected by an identity provider and follow the steps in [Add an identity provider](/docs/5-add-identity.md) section for adding authentication to your app.
-
-[Next](./docs/1-introduction.md)
-
-# Contributing
-
-This project welcomes contributions and suggestions. Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-# Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
-trademarks or logos is subject to and must follow
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+> The application is protected by an identity provider and follow the steps in [Add an identity provider](/docs/add-identity.md) section for adding authentication to your app.

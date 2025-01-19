@@ -1,9 +1,7 @@
 {
-  "name": "Azure Chat Solution Accelerator powered by Azure Open AI Service",
-  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+  "name": "Multiuser AI Chat Solution Accelerator Powered By Neon Serverless Postgres",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:0-18-bullseye",
 
-  // Features to add to the dev container. More info: https://containers.dev/features.
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": true,
