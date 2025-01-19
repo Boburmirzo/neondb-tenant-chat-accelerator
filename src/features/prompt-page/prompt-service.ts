@@ -9,10 +9,11 @@ import {
   PromptModel,
   PromptModelSchema,
 } from "@/features/prompt-page/models";
-import { SqlQuerySpec } from "@azure/cosmos";
 import { getCurrentUser, userHashedId } from "../auth-page/helpers";
-import { ConfigContainer } from "../common/services/cosmos";
+import { NeonDBInstance } from "@/features/common/services/neondb";
 import { uniqueId } from "../common/util";
+
+const sql = NeonDBInstance();
 
 export const CreatePrompt = async (
   props: PromptModel
@@ -38,7 +39,7 @@ export const CreatePrompt = async (
       isPublished: user.isAdmin ? props.isPublished : false,
       userId: await userHashedId(),
       createdAt: new Date(),
-      type: "PROMPT",
+      type: PROMPT_ATTRIBUTE,
     };
 
     const valid = ValidateSchema(modelToSave);
@@ -47,14 +48,27 @@ export const CreatePrompt = async (
       return valid;
     }
 
-    const { resource } = await ConfigContainer().items.create<PromptModel>(
-      modelToSave
-    );
+    const query = `
+      INSERT INTO prompts (id, name, description, is_published, user_id, created_at, type)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *;
+    `;
+    const values = [
+      modelToSave.id,
+      modelToSave.name,
+      modelToSave.description,
+      modelToSave.isPublished,
+      modelToSave.userId,
+      modelToSave.createdAt,
+      modelToSave.type,
+    ];
 
-    if (resource) {
+    const rows = await sql(query, values);
+
+    if (rows.length > 0) {
       return {
         status: "OK",
-        response: resource,
+        response: rows[0],
       };
     } else {
       return {
@@ -82,30 +96,24 @@ export const FindAllPrompts = async (): Promise<
   ServerActionResponse<Array<PromptModel>>
 > => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query: "SELECT * FROM root r WHERE r.type=@type",
-      parameters: [
-        {
-          name: "@type",
-          value: PROMPT_ATTRIBUTE,
-        },
-      ],
-    };
+    const query = `
+      SELECT * FROM prompts
+      WHERE type = $1;
+    `;
+    const values = [PROMPT_ATTRIBUTE];
 
-    const { resources } = await ConfigContainer()
-      .items.query<PromptModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
     return {
       status: "OK",
-      response: resources,
+      response: rows,
     };
   } catch (error) {
     return {
       status: "ERROR",
       errors: [
         {
-          message: `Error retrieving prompt: ${error}`,
+          message: `Error retrieving prompts: ${error}`,
         },
       ],
     };
@@ -141,13 +149,29 @@ export const DeletePrompt = async (
     const promptResponse = await EnsurePromptOperation(promptId);
 
     if (promptResponse.status === "OK") {
-      const { resource: deletedPrompt } = await ConfigContainer()
-        .item(promptId, promptResponse.response.userId)
-        .delete();
+      const query = `
+        DELETE FROM prompts
+        WHERE id = $1
+        RETURNING *;
+      `;
+      const values = [promptId];
+
+      const rows = await sql(query, values);
+
+      if (rows.length > 0) {
+        return {
+          status: "OK",
+          response: rows[0],
+        };
+      }
 
       return {
-        status: "OK",
-        response: deletedPrompt,
+        status: "ERROR",
+        errors: [
+          {
+            message: "Error deleting prompt",
+          },
+        ],
       };
     }
 
@@ -168,25 +192,15 @@ export const FindPromptByID = async (
   id: string
 ): Promise<ServerActionResponse<PromptModel>> => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query: "SELECT * FROM root r WHERE r.type=@type AND r.id=@id",
-      parameters: [
-        {
-          name: "@type",
-          value: PROMPT_ATTRIBUTE,
-        },
-        {
-          name: "@id",
-          value: id,
-        },
-      ],
-    };
+    const query = `
+      SELECT * FROM prompts
+      WHERE type = $1 AND id = $2;
+    `;
+    const values = [PROMPT_ATTRIBUTE, id];
 
-    const { resources } = await ConfigContainer()
-      .items.query<PromptModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
-    if (resources.length === 0) {
+    if (rows.length === 0) {
       return {
         status: "NOT_FOUND",
         errors: [
@@ -199,7 +213,7 @@ export const FindPromptByID = async (
 
     return {
       status: "OK",
-      response: resources[0],
+      response: rows[0],
     };
   } catch (error) {
     return {
@@ -238,14 +252,33 @@ export const UpsertPrompt = async (
         return validationResponse;
       }
 
-      const { resource } = await ConfigContainer().items.upsert<PromptModel>(
-        modelToUpdate
-      );
+      const query = `
+        INSERT INTO prompts (id, name, description, is_published, user_id, created_at, type)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (id) DO UPDATE
+        SET name = EXCLUDED.name,
+            description = EXCLUDED.description,
+            is_published = EXCLUDED.is_published,
+            user_id = EXCLUDED.user_id,
+            created_at = EXCLUDED.created_at
+        RETURNING *;
+      `;
+      const values = [
+        modelToUpdate.id,
+        modelToUpdate.name,
+        modelToUpdate.description,
+        modelToUpdate.isPublished,
+        modelToUpdate.userId,
+        modelToUpdate.createdAt,
+        modelToUpdate.type,
+      ];
 
-      if (resource) {
+      const rows = await sql(query, values);
+
+      if (rows.length > 0) {
         return {
           status: "OK",
-          response: resource,
+          response: rows[0],
         };
       }
 

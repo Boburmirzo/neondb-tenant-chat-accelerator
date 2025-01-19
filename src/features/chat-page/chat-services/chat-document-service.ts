@@ -1,15 +1,11 @@
 "use server";
-import "server-only";
+import { NeonDBInstance } from "@/features/common/services/neondb";
 
 import { userHashedId } from "@/features/auth-page/helpers";
-import { HistoryContainer } from "@/features/common/services/cosmos";
-
 import { RevalidateCache } from "@/features/common/navigation-helpers";
 import { ServerActionResponse } from "@/features/common/server-action-response";
 import { DocumentIntelligenceInstance } from "@/features/common/services/document-intelligence";
 import { uniqueId } from "@/features/common/util";
-import { SqlQuerySpec } from "@azure/cosmos";
-import { EnsureIndexIsCreated } from "./azure-ai-search/azure-ai-search";
 import { CHAT_DOCUMENT_ATTRIBUTE, ChatDocumentModel } from "./models";
 
 const MAX_UPLOAD_DOCUMENT_SIZE: number = 20000000;
@@ -17,28 +13,25 @@ const CHUNK_SIZE = 2300;
 // 25% overlap
 const CHUNK_OVERLAP = CHUNK_SIZE * 0.25;
 
+const sql = NeonDBInstance();
+
 export const CrackDocument = async (
   formData: FormData
 ): Promise<ServerActionResponse<string[]>> => {
   try {
-    const response = await EnsureIndexIsCreated();
-    if (response.status === "OK") {
-      const fileResponse = await LoadFile(formData);
-      if (fileResponse.status === "OK") {
-        const splitDocuments = await ChunkDocumentWithOverlap(
-          fileResponse.response.join("\n")
-        );
+    const fileResponse = await LoadFile(formData);
+    if (fileResponse.status === "OK") {
+      const splitDocuments = await ChunkDocumentWithOverlap(
+        fileResponse.response.join("\n")
+      );
 
-        return {
-          status: "OK",
-          response: splitDocuments,
-        };
-      }
-
-      return fileResponse;
+      return {
+        status: "OK",
+        response: splitDocuments,
+      };
     }
 
-    return response;
+    return fileResponse;
   } catch (e) {
     return {
       status: "ERROR",
@@ -110,44 +103,19 @@ export const FindAllChatDocuments = async (
   chatThreadID: string
 ): Promise<ServerActionResponse<ChatDocumentModel[]>> => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query:
-        "SELECT * FROM root r WHERE r.type=@type AND r.chatThreadId = @threadId AND r.isDeleted=@isDeleted",
-      parameters: [
-        {
-          name: "@type",
-          value: CHAT_DOCUMENT_ATTRIBUTE,
-        },
-        {
-          name: "@threadId",
-          value: chatThreadID,
-        },
-        {
-          name: "@isDeleted",
-          value: false,
-        },
-      ],
+    const query = `
+      SELECT *
+      FROM chat_documents
+      WHERE type = $1 AND chat_thread_id = $2 AND is_deleted = $3;
+    `;
+    const values = [CHAT_DOCUMENT_ATTRIBUTE, chatThreadID, false];
+
+    const rows = await sql(query, values);
+
+    return {
+      status: "OK",
+      response: rows,
     };
-
-    const { resources } = await HistoryContainer()
-      .items.query<ChatDocumentModel>(querySpec)
-      .fetchAll();
-
-    if (resources) {
-      return {
-        status: "OK",
-        response: resources,
-      };
-    } else {
-      return {
-        status: "ERROR",
-        errors: [
-          {
-            message: "No documents found",
-          },
-        ],
-      };
-    }
   } catch (e) {
     return {
       status: "ERROR",
@@ -175,17 +143,32 @@ export const CreateChatDocument = async (
       name: fileName,
     };
 
-    const { resource } =
-      await HistoryContainer().items.upsert<ChatDocumentModel>(modelToSave);
-    RevalidateCache({
-      page: "chat",
-      params: chatThreadID,
-    });
+    const query = `
+      INSERT INTO chat_documents (id, chat_thread_id, user_id, created_at, type, is_deleted, name)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *;
+    `;
+    const values = [
+      modelToSave.id,
+      modelToSave.chatThreadId,
+      modelToSave.userId,
+      modelToSave.createdAt,
+      modelToSave.type,
+      modelToSave.isDeleted,
+      modelToSave.name,
+    ];
 
-    if (resource) {
+    const rows = await sql(query, values);
+
+    if (rows.length > 0) {
+      RevalidateCache({
+        page: "chat",
+        params: chatThreadID,
+      });
+
       return {
         status: "OK",
-        response: resource,
+        response: rows[0],
       };
     }
 

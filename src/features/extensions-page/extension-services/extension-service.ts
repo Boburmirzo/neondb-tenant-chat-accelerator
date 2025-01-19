@@ -1,5 +1,5 @@
 "use server";
-import "server-only";
+import { NeonDBInstance } from "@/features/common/services/neondb";
 
 import {
   getCurrentUser,
@@ -15,11 +15,9 @@ import {
   ServerActionResponse,
   zodErrorsToServerActionErrors,
 } from "@/features/common/server-action-response";
-import { HistoryContainer } from "@/features/common/services/cosmos";
 import { AzureKeyVaultInstance } from "@/features/common/services/key-vault";
 import { uniqueId } from "@/features/common/util";
 import { AI_NAME, CHAT_DEFAULT_PERSONA } from "@/features/theme/theme-config";
-import { SqlQuerySpec } from "@azure/cosmos";
 import {
   EXTENSION_ATTRIBUTE,
   ExtensionModel,
@@ -27,30 +25,21 @@ import {
 } from "./models";
 
 const KEY_VAULT_MASK = "**********";
+const sql = NeonDBInstance();
 
 export const FindExtensionByID = async (
   id: string
 ): Promise<ServerActionResponse<ExtensionModel>> => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query: "SELECT * FROM root r WHERE r.type=@type AND r.id=@id",
-      parameters: [
-        {
-          name: "@type",
-          value: EXTENSION_ATTRIBUTE,
-        },
-        {
-          name: "@id",
-          value: id,
-        },
-      ],
-    };
+    const query = `
+      SELECT * FROM extensions
+      WHERE type = $1 AND id = $2;
+    `;
+    const values = [EXTENSION_ATTRIBUTE, id];
 
-    const { resources } = await HistoryContainer()
-      .items.query<ExtensionModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
-    if (resources.length === 0) {
+    if (rows.length === 0) {
       return {
         status: "NOT_FOUND",
         errors: [
@@ -63,7 +52,7 @@ export const FindExtensionByID = async (
 
     return {
       status: "OK",
-      response: resources[0]!,
+      response: rows[0],
     };
   } catch (error) {
     return {
@@ -83,12 +72,11 @@ export const CreateExtension = async (
   try {
     const user = await getCurrentUser();
 
-    // ensure to reset the id's since they are generated on the client
-    inputModel.headers.map((h) => {
+    inputModel.headers.forEach((h) => {
       h.id = uniqueId();
     });
 
-    inputModel.functions.map((f) => {
+    inputModel.functions.forEach((f) => {
       f.id = uniqueId();
     });
 
@@ -100,7 +88,7 @@ export const CreateExtension = async (
       isPublished: user.isAdmin ? inputModel.isPublished : false,
       userId: await userHashedId(),
       createdAt: new Date(),
-      type: "EXTENSION",
+      type: EXTENSION_ATTRIBUTE,
       functions: inputModel.functions,
       headers: inputModel.headers,
     };
@@ -110,24 +98,41 @@ export const CreateExtension = async (
     if (validatedFields.status === "OK") {
       await secureHeaderValues(modelToSave);
 
-      const { resource } =
-        await HistoryContainer().items.create<ExtensionModel>(modelToSave);
+      const query = `
+        INSERT INTO extensions (id, name, execution_steps, description, is_published, user_id, created_at, type, functions, headers)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *;
+      `;
+      const values = [
+        modelToSave.id,
+        modelToSave.name,
+        modelToSave.executionSteps,
+        modelToSave.description,
+        modelToSave.isPublished,
+        modelToSave.userId,
+        modelToSave.createdAt,
+        modelToSave.type,
+        JSON.stringify(modelToSave.functions),
+        JSON.stringify(modelToSave.headers),
+      ];
 
-      if (resource) {
+      const rows = await sql(query, values);
+
+      if (rows.length > 0) {
         return {
           status: "OK",
-          response: resource,
-        };
-      } else {
-        return {
-          status: "ERROR",
-          errors: [
-            {
-              message: `Unable to add Extension: ${resource}`,
-            },
-          ],
+          response: rows[0],
         };
       }
+
+      return {
+        status: "ERROR",
+        errors: [
+          {
+            message: `Unable to add Extension`,
+          },
+        ],
+      };
     } else {
       return validatedFields;
     }
@@ -137,6 +142,135 @@ export const CreateExtension = async (
       errors: [
         {
           message: `Error adding Extension: ${error}`,
+        },
+      ],
+    };
+  }
+};
+
+export const UpdateExtension = async (
+  inputModel: ExtensionModel
+): Promise<ServerActionResponse<ExtensionModel>> => {
+  try {
+    const extensionResponse = await EnsureExtensionOperation(inputModel.id);
+    const user = await getCurrentUser();
+
+    if (extensionResponse.status === "OK") {
+      const existingExtension = extensionResponse.response;
+
+      inputModel.isPublished = user.isAdmin
+        ? inputModel.isPublished
+        : existingExtension.isPublished;
+
+      const updatedModel: ExtensionModel = {
+        ...existingExtension,
+        name: inputModel.name,
+        executionSteps: inputModel.executionSteps,
+        description: inputModel.description,
+        isPublished: inputModel.isPublished,
+        functions: inputModel.functions,
+        headers: inputModel.headers,
+      };
+
+      const validationResponse = validateSchema(updatedModel);
+      if (validationResponse.status !== "OK") {
+        return validationResponse;
+      }
+
+      await secureHeaderValues(updatedModel);
+
+      const query = `
+        UPDATE extensions
+        SET name = $2,
+            execution_steps = $3,
+            description = $4,
+            is_published = $5,
+            functions = $6,
+            headers = $7
+        WHERE id = $1
+        RETURNING *;
+      `;
+      const values = [
+        updatedModel.id,
+        updatedModel.name,
+        updatedModel.executionSteps,
+        updatedModel.description,
+        updatedModel.isPublished,
+        JSON.stringify(updatedModel.functions),
+        JSON.stringify(updatedModel.headers),
+      ];
+
+      const rows = await sql(query, values);
+
+      if (rows.length > 0) {
+        return {
+          status: "OK",
+          response: rows[0],
+        };
+      }
+
+      return {
+        status: "ERROR",
+        errors: [
+          {
+            message: `Error updating Extension`,
+          },
+        ],
+      };
+    }
+
+    return extensionResponse;
+  } catch (error) {
+    return {
+      status: "ERROR",
+      errors: [
+        {
+          message: `Error updating Extension: ${error}`,
+        },
+      ],
+    };
+  }
+};
+
+export const CreateChatWithExtension = async (
+  extensionId: string
+): Promise<ServerActionResponse<ChatThreadModel>> => {
+  try {
+    const extensionResponse = await FindExtensionByID(extensionId);
+
+    if (extensionResponse.status === "OK") {
+      const extension = extensionResponse.response;
+
+      const modelToSave: ChatThreadModel = {
+        id: uniqueId(),
+        name: extension.name,
+        useName: (await userSession())!.name,
+        userId: await userHashedId(),
+        createdAt: new Date(),
+        lastMessageAt: new Date(),
+        bookmarked: false,
+        isDeleted: false,
+        type: CHAT_THREAD_ATTRIBUTE,
+        personaMessage: "",
+        personaMessageTitle: extension.name,
+        extension: [extension.id],
+      };
+
+      const upsertResponse = await UpsertChatThread(modelToSave);
+
+      return upsertResponse;
+    }
+
+    return {
+      status: "ERROR",
+      errors: extensionResponse.errors,
+    };
+  } catch (error) {
+    return {
+      status: "ERROR",
+      errors: [
+        {
+          message: `Error creating chat with extension: ${error}`,
         },
       ],
     };
@@ -183,8 +317,6 @@ export const EnsureExtensionOperation = async (
   };
 };
 
-// This function must only be used to retrieve the value within the APIs and Server functions.
-// It should never be used to retrieve the value in the client.
 export const FindSecureHeaderValue = async (
   headerId: string
 ): Promise<ServerActionResponse<string>> => {
@@ -203,7 +335,7 @@ export const FindSecureHeaderValue = async (
       status: "ERROR",
       errors: [
         {
-          message: `Error finding secret: ${secret.value}`,
+          message: `Error finding secret for header ID: ${headerId}`,
         },
       ],
     };
@@ -212,7 +344,7 @@ export const FindSecureHeaderValue = async (
       status: "ERROR",
       errors: [
         {
-          message: `Error finding secret: ${error}`,
+          message: `Error finding secure header value: ${error}`,
         },
       ],
     };
@@ -227,29 +359,35 @@ export const DeleteExtension = async (
 
     if (extensionResponse.status === "OK") {
       const vault = AzureKeyVaultInstance();
-      extensionResponse.response.headers.map(async (h) => {
+      const promises = extensionResponse.response.headers.map(async (h) => {
         await vault.beginDeleteSecret(h.id);
       });
+      await Promise.all(promises);
 
-      const { resource } = await HistoryContainer()
-        .item(id, extensionResponse.response.userId)
-        .delete<ExtensionModel>();
+      const query = `
+        DELETE FROM extensions
+        WHERE id = $1
+        RETURNING *;
+      `;
+      const values = [id];
 
-      if (resource) {
+      const rows = await sql(query, values);
+
+      if (rows.length > 0) {
         return {
           status: "OK",
-          response: resource,
-        };
-      } else {
-        return {
-          status: "ERROR",
-          errors: [
-            {
-              message: `Error deleting Extension: ${resource}`,
-            },
-          ],
+          response: rows[0],
         };
       }
+
+      return {
+        status: "ERROR",
+        errors: [
+          {
+            message: `Error deleting Extension`,
+          },
+        ],
+      };
     }
 
     return extensionResponse;
@@ -265,147 +403,31 @@ export const DeleteExtension = async (
   }
 };
 
-export const UpdateExtension = async (
-  inputModel: ExtensionModel
-): Promise<ServerActionResponse<ExtensionModel>> => {
-  try {
-    const extensionResponse = await EnsureExtensionOperation(inputModel.id);
-    const user = await getCurrentUser();
-
-    if (extensionResponse.status === "OK") {
-      inputModel.isPublished = user.isAdmin
-        ? inputModel.isPublished
-        : extensionResponse.response.isPublished;
-
-      inputModel.userId = extensionResponse.response.userId;
-      inputModel.createdAt = new Date();
-      inputModel.type = "EXTENSION";
-
-      inputModel.headers.map((h) => {
-        if (!h.id) {
-          h.id = uniqueId();
-        }
-      });
-
-      inputModel.functions.map((f) => {
-        if (!f.id) {
-          f.id = uniqueId();
-        }
-      });
-
-      // schema validation
-      const validatedFields = validateSchema(inputModel);
-
-      if (validatedFields.status === "OK") {
-        await secureHeaderValues(inputModel);
-
-        const { resource } =
-          await HistoryContainer().items.upsert<ExtensionModel>(inputModel);
-
-        if (resource) {
-          return {
-            status: "OK",
-            response: resource,
-          };
-        } else {
-          return {
-            status: "ERROR",
-            errors: [
-              {
-                message: `Error updating Extension: ${resource}`,
-              },
-            ],
-          };
-        }
-      } else {
-        return validatedFields;
-      }
-    } else {
-      return extensionResponse;
-    }
-  } catch (error) {
-    return {
-      status: "ERROR",
-      errors: [
-        {
-          message: `Error updating Extension: ${error}`,
-        },
-      ],
-    };
-  }
-};
-
 export const FindAllExtensionForCurrentUser = async (): Promise<
   ServerActionResponse<Array<ExtensionModel>>
 > => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query:
-        "SELECT * FROM root r WHERE r.type=@type AND (r.isPublished=@isPublished OR r.userId=@userId) ORDER BY r.createdAt DESC",
-      parameters: [
-        {
-          name: "@type",
-          value: EXTENSION_ATTRIBUTE,
-        },
-        {
-          name: "@isPublished",
-          value: true,
-        },
-        {
-          name: "@userId",
-          value: await userHashedId(),
-        },
-      ],
-    };
+    const query = `
+      SELECT * FROM extensions
+      WHERE type = $1 AND (is_published = $2 OR user_id = $3)
+      ORDER BY created_at DESC;
+    `;
+    const values = [EXTENSION_ATTRIBUTE, true, await userHashedId()];
 
-    const { resources } = await HistoryContainer()
-      .items.query<ExtensionModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
     return {
       status: "OK",
-      response: resources,
+      response: rows,
     };
   } catch (error) {
     return {
       status: "ERROR",
       errors: [
         {
-          message: `Error finding Extension: ${error}`,
+          message: `Error finding Extensions: ${error}`,
         },
       ],
-    };
-  }
-};
-
-export const CreateChatWithExtension = async (
-  extensionId: string
-): Promise<ServerActionResponse<ChatThreadModel>> => {
-  const extensionResponse = await FindExtensionByID(extensionId);
-
-  if (extensionResponse.status === "OK") {
-    const extension = extensionResponse.response;
-
-    const response = await UpsertChatThread({
-      name: extension.name,
-      useName: (await userSession())!.name,
-      userId: await userHashedId(),
-      id: "",
-      createdAt: new Date(),
-      lastMessageAt: new Date(),
-      bookmarked: false,
-      isDeleted: false,
-      type: CHAT_THREAD_ATTRIBUTE,
-      personaMessage: "",
-      personaMessageTitle: CHAT_DEFAULT_PERSONA,
-      extension: [extension.id],
-    });
-
-    return response;
-  } else {
-    return {
-      status: "ERROR",
-      errors: extensionResponse.errors,
     };
   }
 };
@@ -435,23 +457,12 @@ const validateFunctionSchema = (
       const name = functionSchema.name;
       const findName = functionNames.find((n) => n === name);
 
-      if (name === undefined || name === null || name === "") {
+      if (!name || name.includes(" ")) {
         return {
           status: "ERROR",
           errors: [
             {
-              message: `Function name is required.`,
-            },
-          ],
-        };
-      }
-
-      if (name.includes(" ")) {
-        return {
-          status: "ERROR",
-          errors: [
-            {
-              message: `Function name ${name} cannot contain spaces.`,
+              message: `Function name is required and cannot contain spaces.`,
             },
           ],
         };

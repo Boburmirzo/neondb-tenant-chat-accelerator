@@ -1,5 +1,5 @@
 "use server";
-import "server-only";
+import { NeonDBInstance } from "@/features/common/services/neondb";
 
 import {
   getCurrentUser,
@@ -13,48 +13,31 @@ import {
   CHAT_DEFAULT_PERSONA,
   NEW_CHAT_NAME,
 } from "@/features/theme/theme-config";
-import { SqlQuerySpec } from "@azure/cosmos";
-import { HistoryContainer } from "../../common/services/cosmos";
-import { DeleteDocuments } from "./azure-ai-search/azure-ai-search";
-import { FindAllChatDocuments } from "./chat-document-service";
-import { FindAllChatMessagesForCurrentUser } from "./chat-message-service";
 import {
   CHAT_THREAD_ATTRIBUTE,
   ChatDocumentModel,
   ChatThreadModel,
 } from "./models";
 
+const sql = NeonDBInstance();
+
 export const FindAllChatThreadForCurrentUser = async (): Promise<
   ServerActionResponse<Array<ChatThreadModel>>
 > => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query:
-        "SELECT * FROM root r WHERE r.type=@type AND r.userId=@userId AND r.isDeleted=@isDeleted ORDER BY r.createdAt DESC",
-      parameters: [
-        {
-          name: "@type",
-          value: CHAT_THREAD_ATTRIBUTE,
-        },
-        {
-          name: "@userId",
-          value: await userHashedId(),
-        },
-        {
-          name: "@isDeleted",
-          value: false,
-        },
-      ],
-    };
+    const query = `
+      SELECT *
+      FROM chat_threads
+      WHERE type = $1 AND user_id = $2 AND is_deleted = $3
+      ORDER BY created_at DESC;
+    `;
+    const values = [CHAT_THREAD_ATTRIBUTE, await userHashedId(), false];
 
-    const { resources } = await HistoryContainer()
-      .items.query<ChatThreadModel>(querySpec, {
-        partitionKey: await userHashedId(),
-      })
-      .fetchAll();
+    const rows = await sql(query, values);
+
     return {
       status: "OK",
-      response: resources,
+      response: rows,
     };
   } catch (error) {
     return {
@@ -68,34 +51,16 @@ export const FindChatThreadForCurrentUser = async (
   id: string
 ): Promise<ServerActionResponse<ChatThreadModel>> => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query:
-        "SELECT * FROM root r WHERE r.type=@type AND r.userId=@userId AND r.id=@id AND r.isDeleted=@isDeleted",
-      parameters: [
-        {
-          name: "@type",
-          value: CHAT_THREAD_ATTRIBUTE,
-        },
-        {
-          name: "@userId",
-          value: await userHashedId(),
-        },
-        {
-          name: "@id",
-          value: id,
-        },
-        {
-          name: "@isDeleted",
-          value: false,
-        },
-      ],
-    };
+    const query = `
+      SELECT *
+      FROM chat_threads
+      WHERE type = $1 AND user_id = $2 AND id = $3 AND is_deleted = $4;
+    `;
+    const values = [CHAT_THREAD_ATTRIBUTE, await userHashedId(), id, false];
 
-    const { resources } = await HistoryContainer()
-      .items.query<ChatThreadModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
-    if (resources.length === 0) {
+    if (rows.length === 0) {
       return {
         status: "NOT_FOUND",
         errors: [{ message: `Chat thread not found` }],
@@ -104,7 +69,7 @@ export const FindChatThreadForCurrentUser = async (
 
     return {
       status: "OK",
-      response: resources[0],
+      response: rows[0],
     };
   } catch (error) {
     return {
@@ -118,51 +83,26 @@ export const SoftDeleteChatThreadForCurrentUser = async (
   chatThreadID: string
 ): Promise<ServerActionResponse<ChatThreadModel>> => {
   try {
-    const chatThreadResponse = await FindChatThreadForCurrentUser(chatThreadID);
+    const response = await FindChatThreadForCurrentUser(chatThreadID);
 
-    if (chatThreadResponse.status === "OK") {
-      const chatResponse = await FindAllChatMessagesForCurrentUser(
-        chatThreadID
-      );
+    if (response.status === "OK") {
+      const chatThread = response.response;
+      chatThread.isDeleted = true;
 
-      if (chatResponse.status !== "OK") {
-        return chatResponse;
-      }
-      const chats = chatResponse.response;
+      const updateQuery = `
+        UPDATE chat_threads
+        SET is_deleted = $1
+        WHERE id = $2;
+      `;
+      await sql(updateQuery, [true, chatThread.id]);
 
-      chats.forEach(async (chat) => {
-        const itemToUpdate = {
-          ...chat,
-        };
-        itemToUpdate.isDeleted = true;
-        await HistoryContainer().items.upsert(itemToUpdate);
-      });
-
-      const chatDocumentsResponse = await FindAllChatDocuments(chatThreadID);
-
-      if (chatDocumentsResponse.status !== "OK") {
-        return chatDocumentsResponse;
-      }
-
-      const chatDocuments = chatDocumentsResponse.response;
-
-      if (chatDocuments.length !== 0) {
-        await DeleteDocuments(chatThreadID);
-      }
-
-      chatDocuments.forEach(async (chatDocument: ChatDocumentModel) => {
-        const itemToUpdate = {
-          ...chatDocument,
-        };
-        itemToUpdate.isDeleted = true;
-        await HistoryContainer().items.upsert(itemToUpdate);
-      });
-
-      chatThreadResponse.response.isDeleted = true;
-      await HistoryContainer().items.upsert(chatThreadResponse.response);
+      return {
+        status: "OK",
+        response: chatThread,
+      };
     }
 
-    return chatThreadResponse;
+    return response;
   } catch (error) {
     return {
       status: "ERROR",
@@ -196,11 +136,7 @@ export const AddExtensionToChatThread = async (props: {
     if (response.status === "OK") {
       const chatThread = response.response;
 
-      const existingExtension = chatThread.extension.find(
-        (e) => e === props.extensionId
-      );
-
-      if (existingExtension === undefined) {
+      if (!chatThread.extension.includes(props.extensionId)) {
         chatThread.extension.push(props.extensionId);
         return await UpsertChatThread(chatThread);
       }
@@ -224,39 +160,66 @@ export const RemoveExtensionFromChatThread = async (props: {
   chatThreadId: string;
   extensionId: string;
 }): Promise<ServerActionResponse<ChatThreadModel>> => {
-  const response = await FindChatThreadForCurrentUser(props.chatThreadId);
-  if (response.status === "OK") {
-    const chatThread = response.response;
-    chatThread.extension = chatThread.extension.filter(
-      (e) => e !== props.extensionId
-    );
+  try {
+    const response = await FindChatThreadForCurrentUser(props.chatThreadId);
+    if (response.status === "OK") {
+      const chatThread = response.response;
+      chatThread.extension = chatThread.extension.filter(
+        (e) => e !== props.extensionId
+      );
 
-    return await UpsertChatThread(chatThread);
+      return await UpsertChatThread(chatThread);
+    }
+
+    return response;
+  } catch (error) {
+    return {
+      status: "ERROR",
+      errors: [{ message: `${error}` }],
+    };
   }
-
-  return response;
 };
 
 export const UpsertChatThread = async (
   chatThread: ChatThreadModel
 ): Promise<ServerActionResponse<ChatThreadModel>> => {
   try {
-    if (chatThread.id) {
-      const response = await EnsureChatThreadOperation(chatThread.id);
-      if (response.status !== "OK") {
-        return response;
-      }
-    }
+    const query = `
+      INSERT INTO chat_threads (id, created_at, last_message_at, name, user_id, type, is_deleted, bookmarked, persona_message, persona_message_title, extension)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (id) DO UPDATE
+      SET created_at = EXCLUDED.created_at,
+          last_message_at = EXCLUDED.last_message_at,
+          name = EXCLUDED.name,
+          user_id = EXCLUDED.user_id,
+          type = EXCLUDED.type,
+          is_deleted = EXCLUDED.is_deleted,
+          bookmarked = EXCLUDED.bookmarked,
+          persona_message = EXCLUDED.persona_message,
+          persona_message_title = EXCLUDED.persona_message_title,
+          extension = EXCLUDED.extension
+      RETURNING *;
+    `;
+    const values = [
+      chatThread.id || uniqueId(),
+      chatThread.createdAt || new Date(),
+      new Date(),
+      chatThread.name,
+      chatThread.userId,
+      CHAT_THREAD_ATTRIBUTE,
+      chatThread.isDeleted || false,
+      chatThread.bookmarked || false,
+      chatThread.personaMessage || "",
+      chatThread.personaMessageTitle || CHAT_DEFAULT_PERSONA,
+      chatThread.extension || [],
+    ];
 
-    chatThread.lastMessageAt = new Date();
-    const { resource } = await HistoryContainer().items.upsert<ChatThreadModel>(
-      chatThread
-    );
+    const rows = await sql(query, values);
 
-    if (resource) {
+    if (rows.length > 0) {
       return {
         status: "OK",
-        response: resource,
+        response: rows[0],
       };
     }
 
@@ -291,13 +254,31 @@ export const CreateChatThread = async (): Promise<
       extension: [],
     };
 
-    const { resource } = await HistoryContainer().items.create<ChatThreadModel>(
-      modelToSave
-    );
-    if (resource) {
+    const query = `
+      INSERT INTO chat_threads (id, created_at, last_message_at, name, user_id, type, is_deleted, bookmarked, persona_message, persona_message_title, extension)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *;
+    `;
+    const values = [
+      modelToSave.id,
+      modelToSave.createdAt,
+      modelToSave.lastMessageAt,
+      modelToSave.name,
+      modelToSave.userId,
+      modelToSave.type,
+      modelToSave.isDeleted,
+      modelToSave.bookmarked,
+      modelToSave.personaMessage,
+      modelToSave.personaMessageTitle,
+      modelToSave.extension,
+    ];
+
+    const rows = await sql(query, values);
+
+    if (rows.length > 0) {
       return {
         status: "OK",
-        response: resource,
+        response: rows[0],
       };
     }
 
@@ -321,7 +302,6 @@ export const UpdateChatTitle = async (
     const response = await FindChatThreadForCurrentUser(chatThreadId);
     if (response.status === "OK") {
       const chatThread = response.response;
-      // take the first 30 characters
       chatThread.name = title.substring(0, 30);
       return await UpsertChatThread(chatThread);
     }

@@ -1,5 +1,5 @@
 "use server";
-import "server-only";
+import { NeonDBInstance } from "@/features/common/services/neondb";
 
 import { getCurrentUser, userHashedId } from "@/features/auth-page/helpers";
 import { UpsertChatThread } from "@/features/chat-page/chat-services/chat-thread-service";
@@ -11,10 +11,12 @@ import {
   ServerActionResponse,
   zodErrorsToServerActionErrors,
 } from "@/features/common/server-action-response";
-import { HistoryContainer } from "@/features/common/services/cosmos";
 import { uniqueId } from "@/features/common/util";
-import { SqlQuerySpec } from "@azure/cosmos";
-import { PERSONA_ATTRIBUTE, PersonaModel, PersonaModelSchema } from "./models";
+import {
+  PERSONA_ATTRIBUTE,
+  PersonaModel,
+  PersonaModelSchema,
+} from "./models";
 
 interface PersonaInput {
   name: string;
@@ -23,29 +25,21 @@ interface PersonaInput {
   isPublished: boolean;
 }
 
+const sql = NeonDBInstance();
+
 export const FindPersonaByID = async (
   id: string
 ): Promise<ServerActionResponse<PersonaModel>> => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query: "SELECT * FROM root r WHERE r.type=@type AND r.id=@id",
-      parameters: [
-        {
-          name: "@type",
-          value: PERSONA_ATTRIBUTE,
-        },
-        {
-          name: "@id",
-          value: id,
-        },
-      ],
-    };
+    const query = `
+      SELECT * FROM personas
+      WHERE type = $1 AND id = $2;
+    `;
+    const values = [PERSONA_ATTRIBUTE, id];
 
-    const { resources } = await HistoryContainer()
-      .items.query<PersonaModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
-    if (resources.length === 0) {
+    if (rows.length === 0) {
       return {
         status: "NOT_FOUND",
         errors: [
@@ -58,7 +52,7 @@ export const FindPersonaByID = async (
 
     return {
       status: "OK",
-      response: resources[0],
+      response: rows[0],
     };
   } catch (error) {
     return {
@@ -82,11 +76,11 @@ export const CreatePersona = async (
       id: uniqueId(),
       name: props.name,
       description: props.description,
-      personaMessage: props.personaMessage,
+      persona_message: props.personaMessage,
       isPublished: user.isAdmin ? props.isPublished : false,
-      userId: await userHashedId(),
-      createdAt: new Date(),
-      type: "PERSONA",
+      user_id: await userHashedId(),
+      created_at: new Date(),
+      type: PERSONA_ATTRIBUTE,
     };
 
     const valid = ValidateSchema(modelToSave);
@@ -95,14 +89,28 @@ export const CreatePersona = async (
       return valid;
     }
 
-    const { resource } = await HistoryContainer().items.create<PersonaModel>(
-      modelToSave
-    );
+    const query = `
+      INSERT INTO personas (id, name, description, persona_message, is_published, user_id, created_at, type)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *;
+    `;
+    const values = [
+      modelToSave.id,
+      modelToSave.name,
+      modelToSave.description,
+      modelToSave.persona_message,
+      modelToSave.isPublished,
+      modelToSave.user_id,
+      modelToSave.created_at,
+      modelToSave.type,
+    ];
 
-    if (resource) {
+    const rows = await sql(query, values);
+
+    if (rows.length > 0) {
       return {
         status: "OK",
-        response: resource,
+        response: rows[0],
       };
     } else {
       return {
@@ -132,9 +140,10 @@ export const EnsurePersonaOperation = async (
   const personaResponse = await FindPersonaByID(personaId);
   const currentUser = await getCurrentUser();
   const hashedId = await userHashedId();
-
-  if (personaResponse.status === "OK") {
-    if (currentUser.isAdmin || personaResponse.response.userId === hashedId) {
+ 
+  if (personaResponse.status === "OK") {    
+    if (currentUser.isAdmin || personaResponse.response.user_id === hashedId) {
+     
       return personaResponse;
     }
   }
@@ -156,13 +165,29 @@ export const DeletePersona = async (
     const personaResponse = await EnsurePersonaOperation(personaId);
 
     if (personaResponse.status === "OK") {
-      const { resource: deletedPersona } = await HistoryContainer()
-        .item(personaId, personaResponse.response.userId)
-        .delete();
+      const query = `
+        DELETE FROM personas
+        WHERE id = $1
+        RETURNING *;
+      `;
+      const values = [personaId];
+
+      const rows = await sql(query, values);
+
+      if (rows.length > 0) {
+        return {
+          status: "OK",
+          response: rows[0],
+        };
+      }
 
       return {
-        status: "OK",
-        response: deletedPersona,
+        status: "ERROR",
+        errors: [
+          {
+            message: "Error deleting persona",
+          },
+        ],
       };
     }
 
@@ -189,15 +214,17 @@ export const UpsertPersona = async (
       const { response: persona } = personaResponse;
       const user = await getCurrentUser();
 
+      console.log(personaInput);
+
       const modelToUpdate: PersonaModel = {
         ...persona,
         name: personaInput.name,
         description: personaInput.description,
-        personaMessage: personaInput.personaMessage,
+        persona_message: personaInput.persona_message,
         isPublished: user.isAdmin
           ? personaInput.isPublished
           : persona.isPublished,
-        createdAt: new Date(),
+        created_at: new Date(),
       };
 
       const validationResponse = ValidateSchema(modelToUpdate);
@@ -205,14 +232,35 @@ export const UpsertPersona = async (
         return validationResponse;
       }
 
-      const { resource } = await HistoryContainer().items.upsert<PersonaModel>(
-        modelToUpdate
-      );
+      const query = `
+        INSERT INTO personas (id, name, description, persona_message, is_published, user_id, created_at, type)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (id) DO UPDATE
+        SET name = EXCLUDED.name,
+            description = EXCLUDED.description,
+            persona_message = EXCLUDED.persona_message,
+            is_published = EXCLUDED.is_published,
+            user_id = EXCLUDED.user_id,
+            created_at = EXCLUDED.created_at
+        RETURNING *;
+      `;
+      const values = [
+        modelToUpdate.id,
+        modelToUpdate.name,
+        modelToUpdate.description,
+        modelToUpdate.persona_message,
+        modelToUpdate.isPublished,
+        modelToUpdate.user_id,
+        modelToUpdate.created_at,
+        modelToUpdate.type,
+      ];
 
-      if (resource) {
+      const rows = await sql(query, values);
+
+      if (rows.length > 0) {
         return {
           status: "OK",
-          response: resource,
+          response: rows[0],
         };
       }
 
@@ -243,39 +291,25 @@ export const FindAllPersonaForCurrentUser = async (): Promise<
   ServerActionResponse<Array<PersonaModel>>
 > => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query:
-        "SELECT * FROM root r WHERE r.type=@type AND (r.isPublished=@isPublished OR r.userId=@userId) ORDER BY r.createdAt DESC",
-      parameters: [
-        {
-          name: "@type",
-          value: PERSONA_ATTRIBUTE,
-        },
-        {
-          name: "@isPublished",
-          value: true,
-        },
-        {
-          name: "@userId",
-          value: await userHashedId(),
-        },
-      ],
-    };
+    const query = `
+      SELECT * FROM personas
+      WHERE type = $1 AND (is_published = $2 OR user_id = $3)
+      ORDER BY created_at DESC;
+    `;
+    const values = [PERSONA_ATTRIBUTE, true, await userHashedId()];
 
-    const { resources } = await HistoryContainer()
-      .items.query<PersonaModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
     return {
       status: "OK",
-      response: resources,
+      response: rows,
     };
   } catch (error) {
     return {
       status: "ERROR",
       errors: [
         {
-          message: `Error finding persona: ${error}`,
+          message: `Error finding personas: ${error}`,
         },
       ],
     };
@@ -301,7 +335,7 @@ export const CreatePersonaChat = async (
       bookmarked: false,
       isDeleted: false,
       type: CHAT_THREAD_ATTRIBUTE,
-      personaMessage: persona.personaMessage,
+      personaMessage: persona.persona_message,
       personaMessageTitle: persona.name,
       extension: [],
     });

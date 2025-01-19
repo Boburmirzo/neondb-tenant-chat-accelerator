@@ -6,8 +6,9 @@ import {
   MESSAGE_ATTRIBUTE,
 } from "@/features/chat-page/chat-services/models";
 import { ServerActionResponse } from "@/features/common/server-action-response";
-import { HistoryContainer } from "@/features/common/services/cosmos";
-import { SqlQuerySpec } from "@azure/cosmos";
+import { NeonDBInstance } from "@/features/common/services/neondb";
+
+const sql = NeonDBInstance();
 
 export const FindAllChatThreadsForAdmin = async (
   limit: number,
@@ -23,31 +24,20 @@ export const FindAllChatThreadsForAdmin = async (
   }
 
   try {
-    const querySpec: SqlQuerySpec = {
-      query:
-        "SELECT * FROM root r WHERE r.type=@type ORDER BY r.createdAt DESC OFFSET @offset LIMIT @limit",
-      parameters: [
-        {
-          name: "@type",
-          value: CHAT_THREAD_ATTRIBUTE,
-        },
-        {
-          name: "@offset",
-          value: offset,
-        },
-        {
-          name: "@limit",
-          value: limit,
-        },
-      ],
-    };
+    const query = `
+      SELECT *
+      FROM chat_threads
+      WHERE type = $1
+      ORDER BY created_at DESC
+      OFFSET $2 LIMIT $3;
+    `;
+    const values = [CHAT_THREAD_ATTRIBUTE, offset, limit];
 
-    const { resources } = await HistoryContainer()
-      .items.query<ChatThreadModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
+
     return {
       status: "OK",
-      response: resources,
+      response: rows,
     };
   } catch (error) {
     return {
@@ -70,37 +60,24 @@ export const FindAllChatMessagesForAdmin = async (
   }
 
   try {
-    const querySpec: SqlQuerySpec = {
-      query:
-        "SELECT * FROM root r WHERE r.type=@type AND r.threadId = @threadId ORDER BY r.createdAt ASC",
-      parameters: [
-        {
-          name: "@type",
-          value: MESSAGE_ATTRIBUTE,
-        },
-        {
-          name: "@threadId",
-          value: chatThreadID,
-        },
-      ],
-    };
+    const query = `
+      SELECT *
+      FROM chat_messages
+      WHERE type = $1 AND thread_id = $2
+      ORDER BY created_at ASC;
+    `;
+    const values = [MESSAGE_ATTRIBUTE, chatThreadID];
 
-    const { resources } = await HistoryContainer()
-      .items.query<ChatMessageModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
     return {
       status: "OK",
-      response: resources,
+      response: rows,
     };
-  } catch (e) {
+  } catch (error) {
     return {
       status: "ERROR",
-      errors: [
-        {
-          message: `${e}`,
-        },
-      ],
+      errors: [{ message: `${error}` }],
     };
   }
 };

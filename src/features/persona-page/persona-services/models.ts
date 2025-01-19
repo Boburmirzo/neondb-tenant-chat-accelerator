@@ -6,7 +6,7 @@ export type PersonaModel = z.infer<typeof PersonaModelSchema>;
 
 export const PersonaModelSchema = z.object({
   id: z.string(),
-  userId: z.string(),
+  user_id: z.string(),
   name: z
     .string({
       invalid_type_error: "Invalid title",
@@ -19,7 +19,7 @@ export const PersonaModelSchema = z.object({
     })
     .min(1)
     .refine(refineFromEmpty, "Description cannot be empty"),
-  personaMessage: z
+  persona_message: z
     .string({
       invalid_type_error: "Invalid persona Message",
     })
@@ -27,5 +27,5 @@ export const PersonaModelSchema = z.object({
     .refine(refineFromEmpty, "System message cannot be empty"),
   isPublished: z.boolean(),
   type: z.literal(PERSONA_ATTRIBUTE),
-  createdAt: z.date(),
+  created_at: z.date(),
 });

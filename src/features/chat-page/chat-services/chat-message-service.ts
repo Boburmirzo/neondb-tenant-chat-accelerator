@@ -1,52 +1,37 @@
 "use server";
-import "server-only";
-
+import { NeonDBInstance } from "@/features/common/services/neondb";
 import { userHashedId } from "@/features/auth-page/helpers";
 import { ServerActionResponse } from "@/features/common/server-action-response";
 import { uniqueId } from "@/features/common/util";
-import { SqlQuerySpec } from "@azure/cosmos";
-import { HistoryContainer } from "../../common/services/cosmos";
 import { ChatMessageModel, ChatRole, MESSAGE_ATTRIBUTE } from "./models";
+
+const sql = NeonDBInstance();
 
 export const FindTopChatMessagesForCurrentUser = async (
   chatThreadID: string,
   top: number = 30
 ): Promise<ServerActionResponse<Array<ChatMessageModel>>> => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query:
-        "SELECT TOP @top * FROM root r WHERE r.type=@type AND r.threadId = @threadId AND r.userId=@userId AND r.isDeleted=@isDeleted ORDER BY r.createdAt DESC",
-      parameters: [
-        {
-          name: "@type",
-          value: MESSAGE_ATTRIBUTE,
-        },
-        {
-          name: "@threadId",
-          value: chatThreadID,
-        },
-        {
-          name: "@userId",
-          value: await userHashedId(),
-        },
-        {
-          name: "@isDeleted",
-          value: false,
-        },
-        {
-          name: "@top",
-          value: top,
-        },
-      ],
-    };
+    const query = `
+      SELECT *
+      FROM chat_messages
+      WHERE type = $1 AND thread_id = $2 AND user_id = $3 AND is_deleted = $4
+      ORDER BY created_at DESC
+      LIMIT $5;
+    `;
+    const values = [
+      MESSAGE_ATTRIBUTE,
+      chatThreadID,
+      await userHashedId(),
+      false,
+      top,
+    ];
 
-    const { resources } = await HistoryContainer()
-      .items.query<ChatMessageModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
     return {
       status: "OK",
-      response: resources,
+      response: rows,
     };
   } catch (e) {
     return {
@@ -64,36 +49,24 @@ export const FindAllChatMessagesForCurrentUser = async (
   chatThreadID: string
 ): Promise<ServerActionResponse<Array<ChatMessageModel>>> => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query:
-        "SELECT * FROM root r WHERE r.type=@type AND r.threadId = @threadId AND r.userId=@userId AND  r.isDeleted=@isDeleted ORDER BY r.createdAt ASC",
-      parameters: [
-        {
-          name: "@type",
-          value: MESSAGE_ATTRIBUTE,
-        },
-        {
-          name: "@threadId",
-          value: chatThreadID,
-        },
-        {
-          name: "@userId",
-          value: await userHashedId(),
-        },
-        {
-          name: "@isDeleted",
-          value: false,
-        },
-      ],
-    };
+    const query = `
+      SELECT *
+      FROM chat_messages
+      WHERE type = $1 AND thread_id = $2 AND user_id = $3 AND is_deleted = $4
+      ORDER BY created_at ASC;
+    `;
+    const values = [
+      MESSAGE_ATTRIBUTE,
+      chatThreadID,
+      await userHashedId(),
+      false,
+    ];
 
-    const { resources } = await HistoryContainer()
-      .items.query<ChatMessageModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
     return {
       status: "OK",
-      response: resources,
+      response: rows,
     };
   } catch (e) {
     return {
@@ -140,21 +113,40 @@ export const UpsertChatMessage = async (
   chatModel: ChatMessageModel
 ): Promise<ServerActionResponse<ChatMessageModel>> => {
   try {
-    const modelToSave: ChatMessageModel = {
-      ...chatModel,
-      id: uniqueId(),
-      createdAt: new Date(),
-      type: MESSAGE_ATTRIBUTE,
-      isDeleted: false,
-    };
+    const query = `
+      INSERT INTO chat_messages (id, created_at, type, is_deleted, content, name, role, thread_id, user_id, multi_modal_image)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ON CONFLICT (id) DO UPDATE
+      SET created_at = EXCLUDED.created_at,
+          type = EXCLUDED.type,
+          is_deleted = EXCLUDED.is_deleted,
+          content = EXCLUDED.content,
+          name = EXCLUDED.name,
+          role = EXCLUDED.role,
+          thread_id = EXCLUDED.thread_id,
+          user_id = EXCLUDED.user_id,
+          multi_modal_image = EXCLUDED.multi_modal_image
+      RETURNING *;
+    `;
+    const values = [
+      chatModel.id,
+      new Date(),
+      MESSAGE_ATTRIBUTE,
+      false,
+      chatModel.content,
+      chatModel.name,
+      chatModel.role,
+      chatModel.threadId,
+      chatModel.userId,
+      chatModel.multiModalImage,
+    ];
 
-    const { resource } =
-      await HistoryContainer().items.upsert<ChatMessageModel>(modelToSave);
+    const rows = await sql(query, values);
 
-    if (resource) {
+    if (rows.length > 0) {
       return {
         status: "OK",
-        response: resource,
+        response: rows[0],
       };
     }
 

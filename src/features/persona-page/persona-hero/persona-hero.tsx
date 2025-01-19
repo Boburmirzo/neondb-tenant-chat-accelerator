@@ -46,7 +46,7 @@ Example:
           })
         }
       />
-      <HeroButton
+      {/* <HeroButton
         title="ReactJS Expert"
         description="ReactJs expert who can write clean functional components."
         icon={<Atom />}
@@ -81,7 +81,7 @@ export { Input };
             description: "Customer service persona.",
           })
         }
-      />
+      /> */}
     </Hero>
   );
 };

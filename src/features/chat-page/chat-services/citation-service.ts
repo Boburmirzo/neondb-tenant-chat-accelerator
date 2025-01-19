@@ -1,19 +1,31 @@
+import { NeonDBInstance } from "@/features/common/services/neondb";
 import { userHashedId } from "@/features/auth-page/helpers";
 import { ServerActionResponse } from "@/features/common/server-action-response";
-import { HistoryContainer } from "@/features/common/services/cosmos";
 import { uniqueId } from "@/features/common/util";
-import { SqlQuerySpec } from "@azure/cosmos";
 import { DocumentSearchResponse } from "./azure-ai-search/azure-ai-search";
 import { CHAT_CITATION_ATTRIBUTE, ChatCitationModel } from "./models";
+
+const sql = NeonDBInstance();
 
 export const CreateCitation = async (
   model: ChatCitationModel
 ): Promise<ServerActionResponse<ChatCitationModel>> => {
   try {
-    const { resource } =
-      await HistoryContainer().items.create<ChatCitationModel>(model);
+    const query = `
+      INSERT INTO chat_citations (id, content, type, user_id)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *;
+    `;
+    const values = [
+      model.id,
+      model.content,
+      model.type,
+      model.userId,
+    ];
 
-    if (!resource) {
+    const rows = await sql(query, values);
+
+    if (rows.length === 0) {
       return {
         status: "ERROR",
         errors: [{ message: "Citation not created" }],
@@ -22,7 +34,7 @@ export const CreateCitation = async (
 
     return {
       status: "OK",
-      response: resource,
+      response: rows[0],
     };
   } catch (error) {
     return {
@@ -32,8 +44,6 @@ export const CreateCitation = async (
   }
 };
 
-// Create citations for the documents with a user as optional parameter
-// when calling this method from the extension, you must provide the user as the REST API does not have access to the user
 export const CreateCitations = async (
   models: DocumentSearchResponse[],
   userId?: string
@@ -58,30 +68,16 @@ export const FindCitationByID = async (
   id: string
 ): Promise<ServerActionResponse<ChatCitationModel>> => {
   try {
-    const querySpec: SqlQuerySpec = {
-      query:
-        "SELECT * FROM root r WHERE r.type=@type AND r.id=@id AND r.userId=@userId ",
-      parameters: [
-        {
-          name: "@type",
-          value: CHAT_CITATION_ATTRIBUTE,
-        },
-        {
-          name: "@id",
-          value: id,
-        },
-        {
-          name: "@userId",
-          value: await userHashedId(),
-        },
-      ],
-    };
+    const query = `
+      SELECT *
+      FROM chat_citations
+      WHERE type = $1 AND id = $2 AND user_id = $3;
+    `;
+    const values = [CHAT_CITATION_ATTRIBUTE, id, await userHashedId()];
 
-    const { resources } = await HistoryContainer()
-      .items.query<ChatCitationModel>(querySpec)
-      .fetchAll();
+    const rows = await sql(query, values);
 
-    if (resources.length === 0) {
+    if (rows.length === 0) {
       return {
         status: "ERROR",
         errors: [{ message: "Citation not found" }],
@@ -90,7 +86,7 @@ export const FindCitationByID = async (
 
     return {
       status: "OK",
-      response: resources[0],
+      response: rows[0],
     };
   } catch (error) {
     return {
