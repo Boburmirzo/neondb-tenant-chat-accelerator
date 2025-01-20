@@ -1,4 +1,4 @@
-# Tenant AI Chat Solution Accelerator
+# Azure Tenant AI Chat Solution Accelerator
 
 ## Introduction
 
@@ -57,6 +57,8 @@ Tenant AI Chat Solution Accelerator uses [Neon Serverless Postgres](https://lear
 ## Solution Architecture
 
 The following high-level diagram depicts the architecture of the solution accelerator:
+
+![Azure Tenant AI Chat solution Architecture](/assets/Multiuser%20AI%20Chat%20Solution%20Accelerator%20App%20View%202.png)
 
 ## 👨🏻‍💻 Run Locally
 
