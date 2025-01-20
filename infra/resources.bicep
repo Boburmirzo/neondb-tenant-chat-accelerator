@@ -1,4 +1,4 @@
-param name string = 'multiuser-ai-chat'
+param name string = 'internal-ai-chat'
 param resourceToken string
 
 param openai_api_version string

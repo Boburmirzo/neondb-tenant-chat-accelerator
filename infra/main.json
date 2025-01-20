@@ -251,7 +251,7 @@
           "parameters": {
             "name": {
               "type": "string",
-              "defaultValue": "multiuser-ai-chat"
+              "defaultValue": "internal-ai-chat"
             },
             "resourceToken": {
               "type": "string"

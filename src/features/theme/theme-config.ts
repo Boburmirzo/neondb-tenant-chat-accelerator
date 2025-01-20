@@ -1,5 +1,5 @@
-export const AI_NAME = "MultiUser AI Chat";
-export const AI_DESCRIPTION = "AI Chat Accelerator with Neon on Azure";
+export const AI_NAME = "Tenant AI Chat";
+export const AI_DESCRIPTION = "AI Chat Accelerator powered by Neon on Azure";
 export const CHAT_DEFAULT_PERSONA = AI_NAME + " default";
 
 export const CHAT_DEFAULT_SYSTEM_PROMPT = `You are a friendly ${AI_NAME} AI assistant. You must always return in markdown format.
