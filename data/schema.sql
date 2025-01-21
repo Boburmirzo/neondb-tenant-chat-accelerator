@@ -13,6 +13,14 @@ CREATE TABLE chat_threads (
     extension TEXT[] DEFAULT '{}' -- Array of extension names
 );
 
+CREATE TABLE chat_citations (
+    id TEXT PRIMARY KEY,               -- String-based unique identifier for the citation
+    content TEXT NOT NULL,             -- Citation content
+    type TEXT NOT NULL,                -- Type of the citation
+    user_id TEXT NOT NULL,             -- User ID associated with the citation
+    created_at TIMESTAMP NOT NULL DEFAULT NOW() -- Timestamp for when the citation was created
+);
+
 CREATE TABLE personas (
     id CHAR(64) PRIMARY KEY,           -- String-based ID (64-character hexadecimal)
     name TEXT NOT NULL,                -- Name of the persona
@@ -44,8 +52,7 @@ CREATE TABLE documents (
     chat_thread_id TEXT NOT NULL, -- String-based chat thread ID
     embedding VECTOR(1536), -- Embeddings column
     user_id TEXT NOT NULL, -- String-based user ID
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    type TEXT NOT NULL
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE chat_messages (

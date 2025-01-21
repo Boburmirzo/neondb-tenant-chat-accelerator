@@ -16,6 +16,10 @@ Tenant AI Chat Solution Accelerator uses [Neon Serverless Postgres](https://lear
 - 🎙️ **Speech and Voice Support**: Enables multilingual voice interactions in the chat application. Integrate Azure Speech Service for speech-to-text and text-to-speech capabilities.
 - 🌐 **Deployment-Ready Architecture**: Fully deployable to Azure App Service with scalability for enterprise workloads.
 
+## Demo
+
+![Azure Tenant AI Chat Solution Accelerator Demo](/assets/Neon%20Tenant%20AI%20Chat%20Demo.gif)
+
 ## Solution Benefits
 
 - **Private**: Offers both application and database level isolation with standalone single-tenant app with single-tenant database. You can use it with your own internal data sources (PDFs, Docs) or integrate with your internal services (APIs)
@@ -106,7 +110,7 @@ You can deploy the application using one of the following options:
 
 1. Download the [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview)
 2. Run `azd auth login` and log in using your Azure account credentials.
-3. If you have not cloned this repo, run `azd init -t microsoft/azurechat`. If you have cloned this repo, just run 'azd init' from the repo root directory.
+3. If you have not cloned this repo, run `azd init -t https://github.com/neondatabase-labs/azure-tenant-ai-chat`. If you have cloned this repo, just run 'azd init' from the repo root directory.
 4. Run `azd up` to provision and deploy the application
 
 ### 2. Azure Portal Deployment
@@ -116,7 +120,7 @@ You can deploy the application using one of the following options:
 
 Click on the Deploy to Azure button to deploy the Azure resources for the application.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FBoburmirzo%2Fneondb-tenant-chat-accelerator%2Fmain%2Finfra%2Fmain.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fneondatabase-lab%2Fazure-tenant-ai-chat%2Fmain%2Finfra%2Fmain.json)
 
 > [!IMPORTANT]
 > The application is protected by an identity provider and follow the steps in [Add an identity provider](/docs/add-identity.md) section for adding authentication to your app.
@@ -126,10 +130,10 @@ Click on the Deploy to Azure button to deploy the Azure resources for the applic
 Pricing varies per region and usage, so it isn't possible to predict exact costs for your usage.
 However, you can try the [Azure pricing calculator - Sample Estimate](https://azure.com/e/6575aeb258c54e9a84e06e90d4a0ab0c) for the resources below.
 
+- Neon Serverless Postgres: Free US$0.00/month, free plan includes 10 projects, 0.5 GB storage, 190 compute hours, autoscaling up to 2 CU, read replicas, 90+ Postgres extensions including pgvector extension.
 - Azure App Service: Premium V3 Tier 1 CPU core, 4 GB RAM, 250 GB Storage. Pricing per hour. [Pricing](https://azure.microsoft.com/pricing/details/app-service/linux/)
 - Azure Open AI: Standard tier, ChatGPT and Embedding models. Pricing per 1K tokens used, and at least 1K tokens are used per question. [Pricing](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/)
 - Form Recognizer: SO (Standard) tier using pre-built layout. Pricing per document page, sample documents have 261 pages total. [Pricing](https://azure.microsoft.com/pricing/details/form-recognizer/)
-- Neon Serverless Postgres: Free US$0.00/month, free plan includes 10 projects, 0.5 GB storage, 190 compute hours, autoscaling up to 2 CU, read replicas, 90+ Postgres extensions including pgvector extension.
 - Azure Monitor: Pay-as-you-go tier. Costs based on data ingested. [Pricing](https://azure.microsoft.com/pricing/details/monitor/)
 
 To reduce costs, you can switch to free SKUs for Azure App Service and Form Recognizer by changing the parameters file under the `./infra` folder. There are some limits to consider; for example, you can have the free Form Recognizer resource only analyzes the first 2 pages of each document. You can also reduce costs associated with the Form Recognizer by reducing the number of documents you upload.

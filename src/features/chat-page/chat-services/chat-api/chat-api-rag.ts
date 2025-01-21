@@ -8,7 +8,7 @@ import {
   ChatCompletionStreamParams,
 } from "openai/resources/beta/chat/completions";
 import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { SimilaritySearch } from "../azure-ai-search/azure-ai-search";
+import { SimilaritySearch } from "../ai-search/neondb-ai-search";
 import { CreateCitations, FormatCitations } from "../citation-service";
 import { ChatCitationModel, ChatThreadModel } from "../models";
 
@@ -25,14 +25,16 @@ export const ChatApiRAG = async (props: {
   const documentResponse = await SimilaritySearch(
     userMessage,
     10,
-    `user eq '${await userHashedId()}' and chatThreadId eq '${chatThread.id}'`
+    await userHashedId(),
+    chatThread.id
   );
-
+  
   const documents: ChatCitationModel[] = [];
 
   if (documentResponse.status === "OK") {
     const withoutEmbedding = FormatCitations(documentResponse.response);
     const citationResponse = await CreateCitations(withoutEmbedding);
+
 
     citationResponse.forEach((c) => {
       if (c.status === "OK") {
@@ -43,8 +45,10 @@ export const ChatApiRAG = async (props: {
 
   const content = documents
     .map((result, index) => {
-      const content = result.content.document.pageContent;
-      const context = `[${index}]. file name: ${result.content.document.metadata} \n file id: ${result.id} \n ${content}`;
+      const parsedContent = JSON.parse(result.content);
+      const document = parsedContent.document
+      const content = document.pageContent;
+      const context = `[${index}]. file name: ${document.metadata} \n file id: ${result.id} \n ${content}`;
       return context;
     })
     .join("\n------\n");

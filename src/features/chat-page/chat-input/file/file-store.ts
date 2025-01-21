@@ -6,7 +6,7 @@ import {
   showSuccess,
 } from "@/features/globals/global-message-store";
 import { proxy, useSnapshot } from "valtio";
-import { IndexDocuments } from "../../chat-services/azure-ai-search/azure-ai-search";
+import { IndexDocuments } from "../../chat-services/ai-search/neondb-ai-search";
 import {
   CrackDocument,
   CreateChatDocument,

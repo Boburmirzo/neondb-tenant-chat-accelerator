@@ -2,7 +2,7 @@ import { NeonDBInstance } from "@/features/common/services/neondb";
 import { userHashedId } from "@/features/auth-page/helpers";
 import { ServerActionResponse } from "@/features/common/server-action-response";
 import { uniqueId } from "@/features/common/util";
-import { DocumentSearchResponse } from "./azure-ai-search/azure-ai-search";
+import { DocumentSearchResponse } from "./ai-search/neondb-ai-search";
 import { CHAT_CITATION_ATTRIBUTE, ChatCitationModel } from "./models";
 
 const sql = NeonDBInstance();
