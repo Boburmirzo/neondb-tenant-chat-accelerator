@@ -205,7 +205,7 @@ export const UpsertChatThread = async (
       chatThread.createdAt || new Date(),
       new Date(),
       chatThread.name,
-      chatThread.userId,
+      chatThread.userId || (await userHashedId()),
       CHAT_THREAD_ATTRIBUTE,
       chatThread.isDeleted || false,
       chatThread.bookmarked || false,
@@ -228,6 +228,7 @@ export const UpsertChatThread = async (
       errors: [{ message: `Chat thread not found` }],
     };
   } catch (error) {
+    console.error(error);
     return {
       status: "ERROR",
       errors: [{ message: `${error}` }],
