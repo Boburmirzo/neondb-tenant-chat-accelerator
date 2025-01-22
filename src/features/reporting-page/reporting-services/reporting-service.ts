@@ -8,7 +8,6 @@ import {
 import { ServerActionResponse } from "@/features/common/server-action-response";
 import { NeonDBInstance } from "@/features/common/services/neondb";
 
-const sql = NeonDBInstance();
 
 export const FindAllChatThreadsForAdmin = async (
   limit: number,
@@ -33,6 +32,7 @@ export const FindAllChatThreadsForAdmin = async (
     `;
     const values = [CHAT_THREAD_ATTRIBUTE, offset, limit];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {
@@ -68,6 +68,7 @@ export const FindAllChatMessagesForAdmin = async (
     `;
     const values = [MESSAGE_ATTRIBUTE, chatThreadID];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {

@@ -20,8 +20,6 @@ export type DocumentSearchResponse = {
   document: NeonSearchDocument;
 };
 
-const sql = NeonDBInstance();
-
 export const SimpleSearch = async (
   searchText?: string,
   filter?: string
@@ -34,7 +32,7 @@ export const SimpleSearch = async (
       AND ($2::text IS NULL OR metadata = $2);
     `;
     const values = [searchText, filter];
-
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {
@@ -90,6 +88,7 @@ export const SimilaritySearch = async (
       k,
     ];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {
@@ -117,7 +116,7 @@ export const IndexDocuments = async (
 ): Promise<Array<ServerActionResponse<boolean>>> => {
   try {
     const documentsToIndex: NeonSearchDocument[] = [];
-
+    const sql = await NeonDBInstance();
     for (const doc of docs) {
       documentsToIndex.push({
         id: uniqueId(),

@@ -5,8 +5,6 @@ import { uniqueId } from "@/features/common/util";
 import { DocumentSearchResponse } from "./ai-search/neondb-ai-search";
 import { CHAT_CITATION_ATTRIBUTE, ChatCitationModel } from "./models";
 
-const sql = NeonDBInstance();
-
 export const CreateCitation = async (
   model: ChatCitationModel
 ): Promise<ServerActionResponse<ChatCitationModel>> => {
@@ -23,6 +21,7 @@ export const CreateCitation = async (
       model.userId,
     ];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length === 0) {
@@ -75,6 +74,7 @@ export const FindCitationByID = async (
     `;
     const values = [CHAT_CITATION_ATTRIBUTE, id, await userHashedId()];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length === 0) {

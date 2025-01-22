@@ -25,7 +25,6 @@ import {
 } from "./models";
 
 const KEY_VAULT_MASK = "**********";
-const sql = NeonDBInstance();
 
 export const FindExtensionByID = async (
   id: string
@@ -37,6 +36,7 @@ export const FindExtensionByID = async (
     `;
     const values = [EXTENSION_ATTRIBUTE, id];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length === 0) {
@@ -116,6 +116,7 @@ export const CreateExtension = async (
         JSON.stringify(modelToSave.headers),
       ];
 
+      const sql = await NeonDBInstance();
       const rows = await sql(query, values);
 
       if (rows.length > 0) {
@@ -200,6 +201,7 @@ export const UpdateExtension = async (
         JSON.stringify(updatedModel.headers),
       ];
 
+      const sql = await NeonDBInstance();
       const rows = await sql(query, values);
 
       if (rows.length > 0) {
@@ -371,6 +373,7 @@ export const DeleteExtension = async (
       `;
       const values = [id];
 
+      const sql = await NeonDBInstance();
       const rows = await sql(query, values);
 
       if (rows.length > 0) {
@@ -414,6 +417,7 @@ export const FindAllExtensionForCurrentUser = async (): Promise<
     `;
     const values = [EXTENSION_ATTRIBUTE, true, await userHashedId()];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {

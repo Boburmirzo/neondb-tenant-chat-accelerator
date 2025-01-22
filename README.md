@@ -2,12 +2,13 @@
 
 ## Introduction
 
-Tenant AI Chat Solution Accelerator uses [Neon Serverless Postgres](https://learn.microsoft.com/en-us/azure/partner-solutions/neon/overview) on Azure to allow organisations to deploy a private chat tenant in their Azure Subscription with dedicated environment and database branches per user. It is a modified version of [Azure Chat Solution Accelerator](https://github.com/microsoft/azurechat) by replacing [Azure AI Search](https://learn.microsoft.com/en-GB/azure/search/) and [Azure CosmosDB](https://learn.microsoft.com/en-GB/azure/cosmos-db/nosql/) with [Neon](https://neon.tech/) for chat data storage and search functionality.
+Tenant AI Chat Solution Accelerator uses [Neon Serverless Postgres](https://learn.microsoft.com/en-us/azure/partner-solutions/neon/overview) on Azure to allow organisations to deploy a private chat tenant in their Azure Subscription with dedicated database per user on Neon. It is a modified version of [Azure Chat Solution Accelerator](https://github.com/microsoft/azurechat) by replacing [Azure AI Search](https://learn.microsoft.com/en-GB/azure/search/) and [Azure CosmosDB](https://learn.microsoft.com/en-GB/azure/cosmos-db/nosql/) with [Neon](https://neon.tech/) for chat data storage and search functionality.
 
 ![Tenant AI Chat Solution Accelerator with Neon](/assets/Multiuser%20AI%20Chat%20Solution%20Accelerator%20App%20View%201.png)
 
 ## Features
 
+- 📀 **Database per user**: Keeps chat data isolated by creating a separate database instance per user.
 - 🔑 **Authentication and User Management**: Allows flexible login options, including OAuth providers like Google, GitHub, and Microsoft Entra ID (Azure AD).
 - 🧠 **AI-Powered Conversations**: Chat with documents such as PDF. You can also buiild your own prompt templates.
 - 💾 **Chat History**: Stores chat history with multiple chat threads, messages, and metadata.
@@ -70,19 +71,19 @@ Clone this repository locally or fork it to your Github account.
 
 ### Prerequisites
 
-- Neon Database: Create a Neon resource on [Azure](https://fyi.neon.tech/azureportal) (or directly via the [Neon Console](https://console.neon.tech/)), if you haven't already provisioned it together with other Azure resources. After creating the instance, set up the required database schemas by running the SQL scripts located in the `data` folder.
+- Neon Account: Create a Neon account on [Neon Console](https://console.neon.tech/) or via the [Azure](https://fyi.neon.tech/azureportal). If you have created your Azure resources using the [Deployment Options](#deployment-options) in this repo, it will create automatically Neon instance on Azure.
 
-- Access the [Neon instance](https://console.neon.tech) and run the SQL queries from the [data folder](/data/schema.sql) to set up the database schema. These include tables like `chat_threads`, `chat_messages`, `personas`, `extensions`, `documents`, and `prompts`.
-
-- Identity Provider: For local development, you have the option of using a username/password. If you prefer to use an Identity Provider, [follow the instructions](/docs/add-identity.md) to configure one.
+- Identity Provider (Optional): For local development, you do not need it. If you prefer to use an Identity Provider, [follow the instructions](/docs/add-identity.md) to configure one.
 
 ### Steps
 
 1. Change directory to the `src` folder
-2. Rename the file `.env.example` to `.env.local` and populate the environment variables based on the deployed resources in Azure.
-3. Install npm packages by running `npm install`
-4. Start the app by running `npm run dev`
-5. Access the app on [http://localhost:3000](http://localhost:3000)
+2. Rename the file `.env.example` to `.env.local` and populate the environment variables (At least Azure OpenAI service to test out AI Chat feature).
+3. Retrive the Neon API Key: Create [create a new API Key](https://neon.tech/docs/manage/api-keys#creating-api-keys) and set it in the `.env.local ` file to the value of `NEON_API_KEY`.
+4. Install npm packages by running `npm install`
+5. Start the app by running `npm run dev`
+6. It automatically creates a new database for the dev user on Neon database and populates schemas from `./data/schema.sql` SQL file used in the application.
+7. Access the app on [http://localhost:3000](http://localhost:3000)
 
 You should now be prompted to login with your chosen OAuth provider.
 

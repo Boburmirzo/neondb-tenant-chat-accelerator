@@ -19,7 +19,6 @@ import {
   ChatThreadModel,
 } from "./models";
 
-const sql = NeonDBInstance();
 
 export const FindAllChatThreadForCurrentUser = async (): Promise<
   ServerActionResponse<Array<ChatThreadModel>>
@@ -33,6 +32,7 @@ export const FindAllChatThreadForCurrentUser = async (): Promise<
     `;
     const values = [CHAT_THREAD_ATTRIBUTE, await userHashedId(), false];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {
@@ -58,6 +58,7 @@ export const FindChatThreadForCurrentUser = async (
     `;
     const values = [CHAT_THREAD_ATTRIBUTE, await userHashedId(), id, false];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length === 0) {
@@ -94,6 +95,8 @@ export const SoftDeleteChatThreadForCurrentUser = async (
         SET is_deleted = $1
         WHERE id = $2;
       `;
+
+      const sql = await NeonDBInstance();
       await sql(updateQuery, [true, chatThread.id]);
 
       return {
@@ -214,6 +217,7 @@ export const UpsertChatThread = async (
       chatThread.extension || [],
     ];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length > 0) {
@@ -274,6 +278,7 @@ export const CreateChatThread = async (): Promise<
       modelToSave.extension,
     ];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length > 0) {

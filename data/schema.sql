@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE chat_threads (
     id TEXT PRIMARY KEY, -- String-based ID
     name TEXT NOT NULL, -- Name of the chat thread

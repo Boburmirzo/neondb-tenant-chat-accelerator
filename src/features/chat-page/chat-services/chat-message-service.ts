@@ -5,8 +5,6 @@ import { ServerActionResponse } from "@/features/common/server-action-response";
 import { uniqueId } from "@/features/common/util";
 import { ChatMessageModel, ChatRole, MESSAGE_ATTRIBUTE } from "./models";
 
-const sql = NeonDBInstance();
-
 export const FindTopChatMessagesForCurrentUser = async (
   chatThreadID: string,
   top: number = 30
@@ -27,6 +25,7 @@ export const FindTopChatMessagesForCurrentUser = async (
       top,
     ];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {
@@ -62,6 +61,7 @@ export const FindAllChatMessagesForCurrentUser = async (
       false,
     ];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {
@@ -141,6 +141,7 @@ export const UpsertChatMessage = async (
       chatModel.multiModalImage,
     ];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length > 0) {

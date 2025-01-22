@@ -13,7 +13,6 @@ import { getCurrentUser, userHashedId } from "../auth-page/helpers";
 import { NeonDBInstance } from "@/features/common/services/neondb";
 import { uniqueId } from "../common/util";
 
-const sql = NeonDBInstance();
 
 export const CreatePrompt = async (
   props: PromptModel
@@ -102,6 +101,7 @@ export const FindAllPrompts = async (): Promise<
     `;
     const values = [PROMPT_ATTRIBUTE];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {
@@ -156,6 +156,7 @@ export const DeletePrompt = async (
       `;
       const values = [promptId];
 
+      const sql = await NeonDBInstance();
       const rows = await sql(query, values);
 
       if (rows.length > 0) {
@@ -198,6 +199,7 @@ export const FindPromptByID = async (
     `;
     const values = [PROMPT_ATTRIBUTE, id];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length === 0) {
@@ -273,6 +275,7 @@ export const UpsertPrompt = async (
         modelToUpdate.type,
       ];
 
+      const sql = await NeonDBInstance();
       const rows = await sql(query, values);
 
       if (rows.length > 0) {

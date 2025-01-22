@@ -13,8 +13,6 @@ const CHUNK_SIZE = 2300;
 // 25% overlap
 const CHUNK_OVERLAP = CHUNK_SIZE * 0.25;
 
-const sql = NeonDBInstance();
-
 export const CrackDocument = async (
   formData: FormData
 ): Promise<ServerActionResponse<string[]>> => {
@@ -110,6 +108,7 @@ export const FindAllChatDocuments = async (
     `;
     const values = [CHAT_DOCUMENT_ATTRIBUTE, chatThreadID, false];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {
@@ -158,6 +157,7 @@ export const CreateChatDocument = async (
       modelToSave.name,
     ];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length > 0) {

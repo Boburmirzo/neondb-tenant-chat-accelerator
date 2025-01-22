@@ -25,7 +25,6 @@ interface PersonaInput {
   isPublished: boolean;
 }
 
-const sql = NeonDBInstance();
 
 export const FindPersonaByID = async (
   id: string
@@ -37,6 +36,7 @@ export const FindPersonaByID = async (
     `;
     const values = [PERSONA_ATTRIBUTE, id];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length === 0) {
@@ -105,6 +105,7 @@ export const CreatePersona = async (
       modelToSave.type,
     ];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     if (rows.length > 0) {
@@ -172,6 +173,7 @@ export const DeletePersona = async (
       `;
       const values = [personaId];
 
+      const sql = await NeonDBInstance();
       const rows = await sql(query, values);
 
       if (rows.length > 0) {
@@ -255,6 +257,7 @@ export const UpsertPersona = async (
         modelToUpdate.type,
       ];
 
+      const sql = await NeonDBInstance();
       const rows = await sql(query, values);
 
       if (rows.length > 0) {
@@ -298,6 +301,7 @@ export const FindAllPersonaForCurrentUser = async (): Promise<
     `;
     const values = [PERSONA_ATTRIBUTE, true, await userHashedId()];
 
+    const sql = await NeonDBInstance();
     const rows = await sql(query, values);
 
     return {
